@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
+import 'home_screen.dart';
+import 'logs_screen.dart';
+import 'profile_screen.dart';
 
 class AddFoodScreen extends StatefulWidget {
   const AddFoodScreen({Key? key}) : super(key: key);
@@ -25,23 +28,34 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   ];
 
   void _onItemTapped(int index) {
+    if (index == _selectedIndex) return;
+    
     setState(() {
       _selectedIndex = index;
     });
 
     // Navigation logic
     switch (index) {
-      case 0:
-        Navigator.pushReplacementNamed(context, '/home');
+      case 0: // Home
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
         break;
-      case 1:
+      case 1: // Foods
         // Already on foods screen
         break;
-      case 2:
-        Navigator.pushReplacementNamed(context, '/logs');
+      case 2: // Logs
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LogsScreen()),
+        );
         break;
-      case 3:
-        Navigator.pushReplacementNamed(context, '/profile');
+      case 3: // Profile
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+        );
         break;
     }
   }

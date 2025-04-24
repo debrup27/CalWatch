@@ -45,7 +45,7 @@ class _LogsScreenState extends State<LogsScreen> {
     });
     
     switch (index) {
-      case 0: // Diary
+      case 0: // Home
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -60,7 +60,7 @@ class _LogsScreenState extends State<LogsScreen> {
       case 2: // Logs
         // Already on Logs screen
         break;
-      case 3: // Settings
+      case 3: // Profile
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const ProfileScreen()),

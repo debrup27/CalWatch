@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'home_screen.dart';
+import 'logs_screen.dart';
+import 'add_food_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -10,6 +13,9 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // Selected index for the bottom navigation
+  int _selectedIndex = 3; // Profile tab selected by default
+  
   // Sample user data
   final Map<String, dynamic> _userData = {
     'name': 'John Doe',
@@ -30,6 +36,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'Potassium': 55,
   };
 
+  void _handleNavigation(int index) {
+    if (index == _selectedIndex) return;
+    
+    setState(() {
+      _selectedIndex = index;
+    });
+    
+    switch (index) {
+      case 0: // Home
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+        break;
+      case 1: // Foods
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AddFoodScreen()),
+        );
+        break;
+      case 2: // Logs
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LogsScreen()),
+        );
+        break;
+      case 3: // Profile
+        // Already on Profile screen
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,10 +83,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         backgroundColor: Colors.black,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -73,6 +107,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Settings section
             _buildSettingsSection(),
           ],
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              spreadRadius: 1,
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.restaurant_menu),
+              label: 'Foods',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today),
+              label: 'Logs',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: Colors.green,
+          unselectedItemColor: Colors.grey,
+          backgroundColor: Colors.transparent,
+          type: BottomNavigationBarType.fixed,
+          showUnselectedLabels: true,
+          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+          unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+          onTap: _handleNavigation,
         ),
       ),
     );

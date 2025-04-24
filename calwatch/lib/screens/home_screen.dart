@@ -19,14 +19,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _selectedIndex = 0; // Diary selected by default
   late AnimationController _controller;
   DateTime _selectedDate = DateTime.now();
+  int _waterGlasses = 0;
   
   // Sample nutrition data
   final Map<String, dynamic> _nutritionData = {
     'caloriesConsumed': 1455,
     'caloriesBurned': 468,
     'calorieGoal': 1820,
-    'waterConsumed': 1.2, // liters
-    'waterGoal': 2.5, // liters
   };
 
   // Sample food entries for the day
@@ -78,31 +77,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
   
   void _handleNavigation(int index) {
+    if (index == _selectedIndex) return;
+    
     setState(() {
       _selectedIndex = index;
     });
     
     switch (index) {
-      case 0: // Diary (Home)
-        // Already on home
+      case 0: // Home
+        // Already on home screen
         break;
       case 1: // Foods
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AddFoodScreen()),
-        ).then((_) => setState(() => _selectedIndex = 0));
+        );
         break;
-      case 2: // Logs (formerly Trends)
-        Navigator.push(
+      case 2: // Logs
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const LogsScreen()),
-        ).then((_) => setState(() => _selectedIndex = 0));
+        );
         break;
-      case 3: // Settings
-        Navigator.push(
+      case 3: // Profile
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const ProfileScreen()),
-        ).then((_) => setState(() => _selectedIndex = 0));
+        );
         break;
     }
   }
@@ -125,6 +126,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  void _addWaterGlass() {
+    setState(() {
+      _waterGlasses++;
+    });
   }
 
   @override
@@ -170,14 +177,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               
               // Water consumption using our new widget
               WaterTrackerWidget(
-                goal: (_nutritionData['waterGoal'] * 1000).toInt(),
-                current: (_nutritionData['waterConsumed'] * 1000).toInt(),
-                onAdd: (int amount) {
-                  // In a real app, this would update the state and API
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Added $amount ml of water'))
-                  );
-                },
+                onAddWater: _addWaterGlass,
               ),
               
               const SizedBox(height: 24),
@@ -191,34 +191,46 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book),
-            label: 'DIARY',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.restaurant_menu),
-            label: 'FOODS',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: 'LOGS',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'SETTINGS',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.black,
-        elevation: 8,
-        type: BottomNavigationBarType.fixed,
-        onTap: _handleNavigation,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              spreadRadius: 1,
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.restaurant_menu),
+              label: 'Foods',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today),
+              label: 'Logs',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: Colors.green,
+          unselectedItemColor: Colors.grey,
+          backgroundColor: Colors.transparent,
+          type: BottomNavigationBarType.fixed,
+          showUnselectedLabels: true,
+          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+          unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+          onTap: _handleNavigation,
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -245,25 +257,60 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final double burnedPercent = (caloriesBurned / calorieGoal).clamp(0.0, 1.0);
     final double remainingPercent = ((calorieGoal - caloriesConsumed) / calorieGoal).clamp(0.0, 1.0);
     
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.black.withOpacity(0.7),
+            Colors.black.withOpacity(0.5),
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildCalorieCircle(
-            'Consumed',
-            caloriesConsumed.toInt(),
-            consumedPercent,
+          Text(
+            'Calories',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          _buildCalorieCircle(
-            'Burned',
-            caloriesBurned.toInt(),
-            burnedPercent,
-          ),
-          _buildCalorieCircle(
-            'Remaining',
-            (calorieGoal - caloriesConsumed).toInt(),
-            remainingPercent,
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildCalorieCircle(
+                'Consumed',
+                caloriesConsumed.toInt(),
+                consumedPercent,
+              ),
+              _buildCalorieCircle(
+                'Burned',
+                caloriesBurned.toInt(),
+                burnedPercent,
+              ),
+              _buildCalorieCircle(
+                'Remaining',
+                (calorieGoal - caloriesConsumed).toInt(),
+                remainingPercent,
+              ),
+            ],
           ),
         ],
       ),
@@ -277,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           animation: _controller,
           builder: (context, child) {
             return CircularPercentIndicator(
-              radius: 50.0,
+              radius: 40.0,
               lineWidth: 8.0,
               animation: false,
               percent: percent * _controller.value,
@@ -288,21 +335,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     '$value',
                     style: GoogleFonts.montserrat(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: 16,
                       color: Colors.white,
                     ),
                   ),
                   Text(
-                    'kcals',
+                    'kcal',
                     style: GoogleFonts.montserrat(
-                      fontSize: 12,
+                      fontSize: 10,
                       color: Colors.grey[400],
                     ),
                   ),
                 ],
               ),
               circularStrokeCap: CircularStrokeCap.round,
-              progressColor: Colors.white,
+              progressColor: _getColorForLabel(label),
               backgroundColor: Colors.grey[800] ?? Colors.grey.shade800,
             );
           },
@@ -318,36 +365,84 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ],
     );
   }
+  
+  Color _getColorForLabel(String label) {
+    switch (label) {
+      case 'Consumed':
+        return Colors.blue;
+      case 'Burned':
+        return Colors.green;
+      case 'Remaining':
+        return Colors.purple;
+      default:
+        return Colors.white;
+    }
+  }
 
   List<Widget> _buildFoodEntries() {
     List<Widget> widgets = [];
     String currentMealType = '';
     
     widgets.add(
-      Padding(
-        padding: const EdgeInsets.only(bottom: 16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      Container(
+        margin: const EdgeInsets.symmetric(vertical: 8.0),
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(16.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.white.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.black.withOpacity(0.7),
+              Colors.black.withOpacity(0.5),
+            ],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Today's Food",
-              style: GoogleFonts.montserrat(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Today's Food",
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  "Calories",
+                  style: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    color: Colors.grey[400],
+                  ),
+                ),
+              ],
             ),
-            Text(
-              "Calories",
-              style: GoogleFonts.montserrat(
-                fontSize: 14,
-                color: Colors.grey[400],
-              ),
-            ),
+            const SizedBox(height: 16),
+            _buildFoodEntriesContent(),
           ],
         ),
       ),
     );
+    
+    return widgets;
+  }
+  
+  Widget _buildFoodEntriesContent() {
+    List<Widget> widgets = [];
+    String currentMealType = '';
     
     for (final entry in _foodEntries) {
       if (entry['mealType'] != currentMealType) {
@@ -370,7 +465,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       widgets.add(_buildFoodEntryItem(entry));
     }
     
-    return widgets;
+    if (widgets.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            "No food entries yet. Tap + to add food.",
+            style: GoogleFonts.montserrat(
+              fontSize: 14,
+              color: Colors.grey[400],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
   }
   
   Widget _buildFoodEntryItem(Map<String, dynamic> entry) {
