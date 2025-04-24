@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'home_screen.dart';
-import 'add_food_screen.dart';
+import 'nutritionist_screen.dart';
 import 'profile_screen.dart';
 import 'dart:ui';
 
@@ -51,10 +51,10 @@ class _LogsScreenState extends State<LogsScreen> {
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
         break;
-      case 1: // Foods
+      case 1: // Nutritionist (formerly Foods)
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const AddFoodScreen()),
+          MaterialPageRoute(builder: (context) => const NutritionistScreen()),
         );
         break;
       case 2: // Logs
@@ -122,8 +122,8 @@ class _LogsScreenState extends State<LogsScreen> {
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.restaurant_menu),
-              label: 'Foods',
+              icon: Icon(Icons.chat_bubble_outline),
+              label: 'Nutritionist',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today),

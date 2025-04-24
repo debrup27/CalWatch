@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'login_screen.dart';
+import 'user_details_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -47,10 +48,13 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           );
           
-          // Navigate to login screen after successful signup
+          // Navigate to user details screen after successful signup
           Future.delayed(const Duration(seconds: 1), () {
             if (mounted) {
-              Navigator.pop(context);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const UserDetailsScreen()),
+              );
             }
           });
         }

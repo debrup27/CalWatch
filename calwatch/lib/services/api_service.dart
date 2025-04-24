@@ -153,7 +153,7 @@ class ApiService {
   
   // Update user profile
   Future<Map<String, dynamic>> updateUserProfile(Map<String, dynamic> profileData) async {
-    final response = await http.put(
+    final response = await http.post(
       Uri.parse('$baseUrl$userProfileEndpoint'),
       headers: await _buildHeaders(),
       body: json.encode(profileData),

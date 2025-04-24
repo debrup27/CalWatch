@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'home_screen.dart';
 import 'logs_screen.dart';
 import 'profile_screen.dart';
+import 'nutritionist_screen.dart';
 
 class AddFoodScreen extends StatefulWidget {
   const AddFoodScreen({Key? key}) : super(key: key);
@@ -42,8 +43,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
         break;
-      case 1: // Foods
-        // Already on foods screen
+      case 1: // Nutritionist (formerly Foods)
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const NutritionistScreen()),
+        );
         break;
       case 2: // Logs
         Navigator.pushReplacement(
@@ -146,8 +150,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.restaurant_menu),
-              label: 'Foods',
+              icon: Icon(Icons.chat_bubble_outline),
+              label: 'Nutritionist',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today),

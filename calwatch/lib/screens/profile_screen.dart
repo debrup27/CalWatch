@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'home_screen.dart';
 import 'logs_screen.dart';
-import 'add_food_screen.dart';
+import 'nutritionist_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -50,10 +50,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
         break;
-      case 1: // Foods
+      case 1: // Nutritionist (formerly Foods)
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const AddFoodScreen()),
+          MaterialPageRoute(builder: (context) => const NutritionistScreen()),
         );
         break;
       case 2: // Logs
@@ -127,8 +127,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.restaurant_menu),
-              label: 'Foods',
+              icon: Icon(Icons.chat_bubble_outline),
+              label: 'Nutritionist',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today),

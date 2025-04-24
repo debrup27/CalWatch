@@ -5,6 +5,7 @@ import '../widgets/water_tracker_widget.dart';
 import 'logs_screen.dart';
 import 'profile_screen.dart';
 import 'add_food_screen.dart';
+import 'nutritionist_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? username;
@@ -87,10 +88,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       case 0: // Home
         // Already on home screen
         break;
-      case 1: // Foods
+      case 1: // Nutritionist (formerly Foods)
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const AddFoodScreen()),
+          MaterialPageRoute(builder: (context) => const NutritionistScreen()),
         );
         break;
       case 2: // Logs
@@ -191,6 +192,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddFoodScreen()),
+          );
+        },
+        backgroundColor: Colors.green,
+        child: const Icon(Icons.add, color: Colors.white),
+        tooltip: 'Add Food',
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.grey[900],
@@ -209,8 +222,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.restaurant_menu),
-              label: 'Foods',
+              icon: Icon(Icons.chat_bubble_outline),
+              label: 'Nutritionist',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today),
@@ -230,20 +243,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
           unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
           onTap: _handleNavigation,
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddFoodScreen()),
-          );
-        },
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        child: const Icon(
-          Icons.add,
-          size: 30,
         ),
       ),
     );
