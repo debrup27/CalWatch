@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/groq_service.dart';
 import 'home_screen.dart';
 import 'logs_screen.dart';
 import 'profile_screen.dart';
@@ -14,27 +15,38 @@ class NutritionistScreen extends StatefulWidget {
 class _NutritionistScreenState extends State<NutritionistScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final GroqService _groqService = GroqService();
+  
   int _selectedIndex = 1; // Nutritionist tab selected
   bool _isTyping = false;
+  bool _isGroqConfigured = false;
   
-  // Sample chat messages
+  // Chat messages
   final List<Map<String, dynamic>> _messages = [
     {
       'isUser': false,
       'message': 'Hello! I\'m your AI Nutritionist. How can I help you with your diet and nutrition goals today?',
       'timestamp': DateTime.now().subtract(const Duration(minutes: 30)),
     },
-    {
-      'isUser': true,
-      'message': 'I want to lose weight but I\'m struggling with my diet.',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 29)),
-    },
-    {
-      'isUser': false,
-      'message': 'I understand how challenging weight loss can be. Based on the profile details you provided, I can help create a personalized plan. Let\'s first talk about your current eating habits. What does your typical daily food intake look like?',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 27)),
-    },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkGroqConfiguration();
+  }
+  
+  Future<void> _checkGroqConfiguration() async {
+    try {
+      final apiKey = await _groqService.getApiKey();
+      setState(() {
+        _isGroqConfigured = apiKey != null && apiKey.isNotEmpty;
+      });
+    } catch (e) {
+      // Handle error
+      print('Error checking Groq configuration: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -74,12 +86,14 @@ class _NutritionistScreenState extends State<NutritionistScreen> {
     }
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
+    
+    final userMessage = _messageController.text.trim();
     
     final newMessage = {
       'isUser': true,
-      'message': _messageController.text.trim(),
+      'message': userMessage,
       'timestamp': DateTime.now(),
     };
     
@@ -90,21 +104,25 @@ class _NutritionistScreenState extends State<NutritionistScreen> {
     });
     
     // Scroll to bottom after sending message
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    });
+    _scrollToBottom();
     
-    // Simulate AI response after 1 second
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      if (!_isGroqConfigured) {
+        // Show error if Groq isn't configured
+        throw Exception('Groq API is not properly configured. Please contact the administrator.');
+      }
+      
+      // Get response from Groq API
+      final response = await _groqService.getNutritionistResponse(
+        userMessage, 
+        _messages.sublist(0, _messages.length - 1) // Exclude the message we just sent
+      );
+      
       if (!mounted) return;
       
       final aiResponse = {
         'isUser': false,
-        'message': _getAIResponse(newMessage['message'] as String),
+        'message': response,
         'timestamp': DateTime.now(),
       };
       
@@ -112,44 +130,85 @@ class _NutritionistScreenState extends State<NutritionistScreen> {
         _messages.add(aiResponse);
         _isTyping = false;
       });
+    } catch (e) {
+      if (!mounted) return;
       
-      // Scroll to bottom after receiving response
-      Future.delayed(const Duration(milliseconds: 100), () {
+      // Handle error
+      final errorResponse = {
+        'isUser': false,
+        'message': 'Sorry, I encountered an error while processing your request: ${e.toString()}',
+        'timestamp': DateTime.now(),
+      };
+      
+      setState(() {
+        _messages.add(errorResponse);
+        _isTyping = false;
+      });
+      
+      // Show error snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+    
+    // Scroll to bottom after receiving response
+    _scrollToBottom();
+  }
+  
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
-      });
+      }
     });
-  }
-  
-  // Sample AI responses based on user input
-  String _getAIResponse(String userMessage) {
-    final lowercaseMsg = userMessage.toLowerCase();
-    
-    if (lowercaseMsg.contains('calorie') || lowercaseMsg.contains('calories')) {
-      return 'Based on your profile details (age, height, weight, and activity level), your daily caloric needs are approximately 1800-2000 calories for maintenance. For weight loss, a moderate deficit of 300-500 calories per day is generally recommended, which would be around 1500-1700 calories daily.';
-    } else if (lowercaseMsg.contains('protein') || lowercaseMsg.contains('fat') || lowercaseMsg.contains('carb')) {
-      return 'A balanced macronutrient distribution would be approximately: 30% protein (115-130g), 30% fat (50-60g), and 40% carbohydrates (150-170g). This can vary based on your specific goals and preferences.';
-    } else if (lowercaseMsg.contains('meal plan') || lowercaseMsg.contains('diet plan')) {
-      return 'I can help create a personalized meal plan for you. For sustainable weight loss, focus on whole foods like lean proteins (chicken, fish, tofu), complex carbs (brown rice, sweet potatoes), healthy fats (avocado, nuts), and plenty of vegetables. Would you like me to suggest a sample day of eating?';
-    } else if (lowercaseMsg.contains('exercise') || lowercaseMsg.contains('workout')) {
-      return 'Exercise is a key component of weight management. Based on your activity level, I recommend a combination of 150 minutes of moderate cardio per week plus 2-3 strength training sessions. This, combined with proper nutrition, will help you reach your goal weight of ${_getRandomWeight()}.';
-    } else if (lowercaseMsg.contains('hungry') || lowercaseMsg.contains('craving')) {
-      return 'Hunger and cravings are normal! Try drinking water first, as thirst is often confused with hunger. For snacks, choose high-protein, high-fiber options like Greek yogurt with berries, apple with almond butter, or a small handful of nuts to stay satisfied between meals.';
-    } else {
-      return 'Thank you for sharing. Based on your goals and profile information, I recommend focusing on creating a sustainable calorie deficit through balanced nutrition and regular physical activity. Would you like specific advice on meal planning, exercise routines, or strategies to overcome common obstacles?';
-    }
-  }
-  
-  String _getRandomWeight() {
-    final weights = ['65kg', '140lbs', '62kg', '135lbs'];
-    return weights[DateTime.now().millisecond % weights.length];
   }
   
   String _formatTime(DateTime timestamp) {
     return '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildMessageBubble(String message, bool isUser, DateTime timestamp) {
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isUser ? Colors.white : Colors.grey[800],
+          borderRadius: BorderRadius.circular(18),
+        ),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message,
+              style: GoogleFonts.montserrat(
+                color: isUser ? Colors.black : Colors.white,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _formatTime(timestamp),
+              style: GoogleFonts.montserrat(
+                color: isUser ? Colors.black54 : Colors.grey[400],
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -198,7 +257,7 @@ class _NutritionistScreenState extends State<NutritionistScreen> {
                     'AI Nutritionist is typing',
                     style: GoogleFonts.montserrat(
                       color: Colors.grey[500],
-                      fontSize: 12,
+                      fontSize: 14,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -216,138 +275,75 @@ class _NutritionistScreenState extends State<NutritionistScreen> {
           
           // Message input area
           Container(
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.grey[900],
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 5,
-                  offset: const Offset(0, -1),
-                ),
-              ],
+              border: Border(
+                top: BorderSide(color: Colors.grey[800]!, width: 1),
+              ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Expanded(
-                  child: TextFormField(
+                  child: TextField(
                     controller: _messageController,
-                    style: GoogleFonts.montserrat(color: Colors.white),
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: 'Ask me about nutrition...',
-                      hintStyle: GoogleFonts.montserrat(color: Colors.grey[500]),
+                      hintText: 'Type your message...',
+                      hintStyle: TextStyle(color: Colors.grey[400]),
                       filled: true,
                       fillColor: Colors.grey[800],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
-                    textCapitalization: TextCapitalization.sentences,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.send,
-                    onFieldSubmitted: (_) => _sendMessage(),
-                    maxLines: null,
+                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _sendMessage,
-                  icon: Icon(
-                    Icons.send_rounded,
-                    color: Colors.green,
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
                   ),
-                  tooltip: 'Send message',
+                  child: IconButton(
+                    icon: const Icon(Icons.send),
+                    color: Colors.black,
+                    onPressed: _sendMessage,
+                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.5),
-              spreadRadius: 1,
-              blurRadius: 10,
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              label: 'Nutritionist',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today),
-              label: 'Logs',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
-          currentIndex: _selectedIndex,
-          selectedItemColor: Colors.green,
-          unselectedItemColor: Colors.grey,
-          backgroundColor: Colors.transparent,
-          type: BottomNavigationBarType.fixed,
-          showUnselectedLabels: true,
-          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-          unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-          onTap: _handleNavigation,
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildMessageBubble(String message, bool isUser, DateTime timestamp) {
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(
-          top: 8,
-          bottom: 8,
-          left: isUser ? 60 : 0,
-          right: isUser ? 0 : 60,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isUser ? Colors.green : Colors.grey[800],
-          borderRadius: BorderRadius.circular(20).copyWith(
-            bottomLeft: isUser ? const Radius.circular(20) : const Radius.circular(0),
-            bottomRight: isUser ? const Radius.circular(0) : const Radius.circular(20),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _handleNavigation,
+        backgroundColor: Colors.grey[900],
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.grey[600],
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message,
-              style: GoogleFonts.montserrat(
-                color: isUser ? Colors.white : Colors.grey[300],
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _formatTime(timestamp),
-              style: GoogleFonts.montserrat(
-                color: isUser ? Colors.white.withOpacity(0.7) : Colors.grey[500],
-                fontSize: 10,
-              ),
-              textAlign: TextAlign.right,
-            ),
-          ],
-        ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.health_and_safety),
+            label: 'Nutritionist',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list_alt),
+            label: 'Logs',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }

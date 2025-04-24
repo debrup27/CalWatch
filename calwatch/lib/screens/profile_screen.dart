@@ -18,9 +18,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Selected index for the bottom navigation
   int _selectedIndex = 3; // Profile tab selected by default
   
-  // Sample user data
+  // User data from API
+  String _username = '';
+  String _email = '';
+  bool _isLoading = true;
+  bool _hasError = false;
+  
+  // Sample user stats
   final Map<String, dynamic> _userData = {
-    'name': 'John Doe',
     'age': 32,
     'height': '180 cm',
     'currentWeight': '72.5 kg',
@@ -37,6 +42,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'Iron': 70,
     'Potassium': 55,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserDetails();
+  }
+  
+  Future<void> _fetchUserDetails() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    
+    try {
+      final apiService = ApiService();
+      final userData = await apiService.getUserDetails();
+      
+      setState(() {
+        _username = userData['username'] ?? '';
+        _email = userData['email'] ?? '';
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching user details: $e');
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+    }
+  }
 
   void _handleNavigation(int index) {
     if (index == _selectedIndex) return;
@@ -184,32 +219,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
           
           const SizedBox(height: 16),
           
-          // User name
-          Text(
-            _userData['name'],
-            style: GoogleFonts.montserrat(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          // User info with loading indicator
+          if (_isLoading)
+            const CircularProgressIndicator(color: Colors.white)
+          else if (_hasError)
+            Column(
+              children: [
+                Text(
+                  'Failed to load user data',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    color: Colors.red[300],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: _fetchUserDetails,
+                  icon: const Icon(Icons.refresh, color: Colors.white, size: 16),
+                  label: Text(
+                    'Retry',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            Column(
+              children: [
+                // Username
+                Text(
+                  _username,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                
+                // Email
+                Text(
+                  _email,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    color: Colors.grey[400],
+                  ),
+                ),
+              ],
             ),
-          ),
           
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           
           // Edit profile button
-          TextButton.icon(
-            onPressed: () {
-              // TODO: Implement edit profile functionality
-            },
-            icon: const Icon(Icons.edit, color: Colors.white, size: 16),
-            label: Text(
-              'Edit Profile',
-              style: GoogleFonts.montserrat(
-                fontSize: 14,
-                color: Colors.white,
+          if (!_isLoading && !_hasError)
+            TextButton.icon(
+              onPressed: () {
+                // TODO: Implement edit profile functionality
+              },
+              icon: const Icon(Icons.edit, color: Colors.white, size: 16),
+              label: Text(
+                'Edit Profile',
+                style: GoogleFonts.montserrat(
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

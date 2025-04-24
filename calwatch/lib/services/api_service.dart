@@ -10,8 +10,8 @@ class ApiService {
   static const String registerEndpoint = '/auth/users/';
   static const String loginEndpoint = '/auth/jwt/create/';
   static const String refreshTokenEndpoint = '/auth/jwt/refresh/';
+  static const String userDetailsEndpoint = '/auth/users/me/';
   static const String resetPasswordEndpoint = '/auth/reset-password';
-  static const String logoutEndpoint = '/auth/logout';
   
   // API Endpoints
   static const String userProfileEndpoint = '/api/user/profile';
@@ -65,7 +65,7 @@ class ApiService {
     if (withAuth) {
       final token = await _getAccessToken();
       if (token != null) {
-        headers['Authorization'] = 'JWT $token';
+        headers['Authorization'] = 'Bearer $token';
       }
     }
     
@@ -503,6 +503,35 @@ class ApiService {
   // Check if user is logged in
   Future<bool> isLoggedIn() async {
     final token = await _getAccessToken();
+    print(token);
     return token != null;
+  }
+
+  // Get user details
+  Future<Map<String, dynamic>> getUserDetails() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$userDetailsEndpoint'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.get(
+            Uri.parse('$baseUrl$userDetailsEndpoint'),
+            headers: await _buildHeaders(),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      print('Error fetching user details: $e');
+      rethrow;
+    }
   }
 } 
