@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
-import 'home_screen.dart';
-import 'logs_screen.dart';
-import 'profile_screen.dart';
-import 'nutritionist_screen.dart';
 
 class AddFoodScreen extends StatefulWidget {
   const AddFoodScreen({Key? key}) : super(key: key);
@@ -17,7 +13,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   final _formKey = GlobalKey<FormState>();
   final _foodNameController = TextEditingController();
   String _selectedMealType = 'Breakfast';
-  int _selectedIndex = 1; // Foods tab selected by default
 
   // Meal type options
   final List<String> _mealTypes = [
@@ -27,42 +22,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     'Snack',
     'Water'
   ];
-
-  void _onItemTapped(int index) {
-    if (index == _selectedIndex) return;
-    
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    // Navigation logic
-    switch (index) {
-      case 0: // Home
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-        break;
-      case 1: // Nutritionist (formerly Foods)
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const NutritionistScreen()),
-        );
-        break;
-      case 2: // Logs
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LogsScreen()),
-        );
-        break;
-      case 3: // Profile
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfileScreen()),
-        );
-        break;
-    }
-  }
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
@@ -84,6 +43,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       setState(() {
         _selectedMealType = 'Breakfast';
       });
+      
+      // Navigate back after successful submission
+      Navigator.pop(context);
     }
   }
 
@@ -102,6 +64,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(
           'Add Food Entry',
           style: GoogleFonts.poppins(
@@ -130,47 +96,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               _buildRecentFoodsList(),
             ],
           ),
-        ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.5),
-              spreadRadius: 1,
-              blurRadius: 10,
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              label: 'Nutritionist',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today),
-              label: 'Logs',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
-          currentIndex: _selectedIndex,
-          selectedItemColor: Colors.green,
-          unselectedItemColor: Colors.grey,
-          backgroundColor: Colors.transparent,
-          type: BottomNavigationBarType.fixed,
-          showUnselectedLabels: true,
-          selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-          unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-          onTap: _onItemTapped,
         ),
       ),
     );

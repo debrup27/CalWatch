@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_theme.dart';
 import 'login_screen.dart';
+import 'home_screen.dart';
+import '../services/api_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -42,14 +44,31 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.repeat(reverse: true);
     
-    // Navigate to login screen after splash
+    // Check login status and navigate accordingly after splash delay
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
+        _checkLoginAndNavigate();
       }
     });
+  }
+  
+  Future<void> _checkLoginAndNavigate() async {
+    final apiService = ApiService();
+    final isLoggedIn = await apiService.isLoggedIn();
+    
+    if (!mounted) return;
+    
+    if (isLoggedIn) {
+      // User is logged in, navigate to home screen
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    } else {
+      // User is not logged in, navigate to login screen
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    }
   }
 
   @override

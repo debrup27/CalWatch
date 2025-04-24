@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'login_screen.dart';
 import 'user_details_screen.dart';
+import '../services/api_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -12,7 +13,7 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -22,7 +23,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -36,10 +37,14 @@ class _SignupScreenState extends State<SignupScreen> {
       });
 
       try {
-        // Simulate signup delay
-        await Future.delayed(const Duration(seconds: 1));
+        // Call signup API
+        final apiService = ApiService();
+        final result = await apiService.signup(
+          _usernameController.text.trim(),
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
         
-        // In a real app, this would be your account creation logic
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -167,11 +172,11 @@ class _SignupScreenState extends State<SignupScreen> {
                           
                           // Name field
                           TextFormField(
-                            controller: _nameController,
+                            controller: _usernameController,
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
-                              labelText: 'Full Name',
-                              hintText: 'Enter your full name',
+                              labelText: 'Username',
+                              hintText: 'Enter your username',
                               hintStyle: TextStyle(
                                 color: Colors.grey[400],
                                 fontFamily: 'Montserrat',
@@ -207,7 +212,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             textInputAction: TextInputAction.next,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Please enter your name';
+                                return 'Please enter your username';
                               }
                               return null;
                             },

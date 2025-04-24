@@ -4,6 +4,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'home_screen.dart';
 import 'logs_screen.dart';
 import 'nutritionist_screen.dart';
+import 'login_screen.dart';
+import '../services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -407,7 +409,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSettingItem(IconData icon, String label, {bool isDestructive = false}) {
     return InkWell(
       onTap: () {
-        // TODO: Implement settings action
+        if (isDestructive) {
+          _handleLogout();
+        } else {
+          // Handle other settings options
+          switch (label) {
+            case 'Notifications':
+              // Navigate to notifications settings
+              break;
+            case 'Privacy':
+              // Navigate to privacy settings
+              break;
+            case 'Help & Support':
+              // Navigate to help & support
+              break;
+            case 'About':
+              // Show about dialog
+              break;
+          }
+        }
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -437,5 +457,115 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  void _handleLogout() {
+    // Show confirmation dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text(
+            'Sign Out',
+            style: GoogleFonts.montserrat(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to sign out?',
+            style: GoogleFonts.montserrat(
+              color: Colors.white,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the dialog
+              },
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.montserrat(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the dialog
+                _performLogout();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              child: Text(
+                'Sign Out',
+                style: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  void _performLogout() {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(
+            color: Colors.white,
+          ),
+        );
+      },
+    );
+    
+    // Call the logout method from ApiService
+    final apiService = ApiService();
+    apiService.logout().then((_) {
+      // Close the loading dialog
+      Navigator.pop(context);
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Logged out successfully',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
+      // Navigate to login screen
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false, // This removes all previous routes from the stack
+      );
+    }).catchError((error) {
+      // Close the loading dialog
+      Navigator.pop(context);
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error logging out: $error',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    });
   }
 } 

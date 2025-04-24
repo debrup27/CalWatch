@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'reset_password_screen.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
+import '../services/api_service.dart';
 
 // Create a simple home page placeholder
 class HomePage extends StatelessWidget {
@@ -204,14 +205,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -224,10 +225,13 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       
       try {
-        // Simulate login delay
-        await Future.delayed(const Duration(seconds: 1));
+        // Call login API
+        final apiService = ApiService();
+        final result = await apiService.login(
+          _usernameController.text.trim(),
+          _passwordController.text.trim(),
+        );
         
-        // In a real app, this would be your authentication logic
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -243,6 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       } catch (e) {
+        print('Login error: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -363,15 +368,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           SizedBox(height: isSmallScreen ? 16 : 24),
                           
-                          // Email field
+                          // Username field
                           TextFormField(
-                            controller: _emailController,
+                            controller: _usernameController,
                             style: GoogleFonts.montserrat(
                               color: Colors.white,
                             ),
                             decoration: InputDecoration(
-                              labelText: 'Email',
-                              hintText: 'Enter your email address',
+                              labelText: 'Username',
+                              hintText: 'Enter your username',
                               hintStyle: GoogleFonts.montserrat(
                                 color: Colors.grey[400],
                               ),
@@ -379,7 +384,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.grey[300],
                               ),
                               prefixIcon: Icon(
-                                Icons.email_outlined,
+                                Icons.person_outlined,
                                 color: Colors.grey[400],
                                 size: isSmallScreen ? 18 : 20,
                               ),
@@ -402,14 +407,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 horizontal: 12,
                               ),
                             ),
-                            keyboardType: TextInputType.emailAddress,
+                            keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.next,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                                return 'Please enter a valid email';
+                                return 'Please enter your username';
                               }
                               return null;
                             },

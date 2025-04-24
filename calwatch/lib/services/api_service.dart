@@ -4,18 +4,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // Base URL for API
-  static const String baseUrl = 'https://api.calwatch.com/api/v1';
+  static const String baseUrl = 'http://192.168.0.174:8000';
   
-  // Endpoints
-  static const String loginEndpoint = '/auth/login';
-  static const String signupEndpoint = '/auth/signup';
+  // Djoser Authentication Endpoints
+  static const String registerEndpoint = '/auth/users/';
+  static const String loginEndpoint = '/auth/jwt/create/';
+  static const String refreshTokenEndpoint = '/auth/jwt/refresh/';
   static const String resetPasswordEndpoint = '/auth/reset-password';
   static const String logoutEndpoint = '/auth/logout';
-  static const String userProfileEndpoint = '/user/profile';
-  static const String nutritionDataEndpoint = '/nutrition/data';
-  static const String foodEntriesEndpoint = '/food/entries';
-  static const String logsEndpoint = '/logs';
-  static const String searchFoodsEndpoint = '/food/search';
+  
+  // API Endpoints
+  static const String userProfileEndpoint = '/api/user/profile';
+  static const String nutritionDataEndpoint = '/api/nutrition/data';
+  static const String foodEntriesEndpoint = '/api/food/entries';
+  static const String logsEndpoint = '/api/logs';
+  static const String searchFoodsEndpoint = '/api/food/search';
   
   // Singleton instance
   static final ApiService _instance = ApiService._internal();
@@ -26,22 +29,30 @@ class ApiService {
   
   ApiService._internal();
   
-  // Get JWT token from shared preferences
-  Future<String?> _getToken() async {
+  // Get access token from shared preferences
+  Future<String?> _getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
+    return prefs.getString('access_token');
   }
   
-  // Save JWT token to shared preferences
-  Future<void> _saveToken(String token) async {
+  // Get refresh token from shared preferences
+  Future<String?> _getRefreshToken() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
+    return prefs.getString('refresh_token');
   }
   
-  // Clear JWT token from shared preferences
-  Future<void> _clearToken() async {
+  // Save JWT tokens to shared preferences
+  Future<void> _saveTokens(String access, String refresh) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
+    await prefs.setString('access_token', access);
+    await prefs.setString('refresh_token', refresh);
+  }
+  
+  // Clear JWT tokens from shared preferences
+  Future<void> _clearTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
   }
   
   // Headers builder with authorization
@@ -52,9 +63,9 @@ class ApiService {
     };
     
     if (withAuth) {
-      final token = await _getToken();
+      final token = await _getAccessToken();
       if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
+        headers['Authorization'] = 'JWT $token';
       }
     }
     
@@ -71,46 +82,86 @@ class ApiService {
       return null;
     } else {
       // Error handling
-      final error = json.decode(response.body);
-      throw Exception(error['message'] ?? 'An error occurred');
+      try {
+        final error = json.decode(response.body);
+        final errorMessage = error is Map ? 
+          (error['detail'] ?? error['message'] ?? 'An error occurred') : 
+          'An error occurred';
+        throw Exception(errorMessage);
+      } catch (e) {
+        throw Exception('An error occurred: ${response.statusCode}');
+      }
+    }
+  }
+  
+  // Refresh access token using refresh token
+  Future<bool> refreshAccessToken() async {
+    final refreshToken = await _getRefreshToken();
+    
+    if (refreshToken == null) {
+      return false;
+    }
+    
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl$refreshTokenEndpoint'),
+        headers: await _buildHeaders(withAuth: false),
+        body: json.encode({
+          'refresh': refreshToken,
+        }),
+      );
+      
+      final data = _handleResponse(response);
+      if (data != null && data['access'] != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('access_token', data['access']);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
     }
   }
   
   // Authentication APIs
   
+  // User registration
+  Future<Map<String, dynamic>> signup(String username, String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl$registerEndpoint'),
+      headers: await _buildHeaders(withAuth: false),
+      body: json.encode({
+        'username': username,
+        'email': email,
+        'password': password,
+        're_password': password,
+      }),
+    );
+    
+    final data = _handleResponse(response);
+    
+    // After registration, immediately log in to get tokens
+    if (data != null) {
+      return await login(username, password);
+    }
+    
+    return data;
+  }
+  
   // User login
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(String username, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl$loginEndpoint'),
       headers: await _buildHeaders(withAuth: false),
       body: json.encode({
-        'email': email,
+        'username': username,
         'password': password,
       }),
     );
     
     final data = _handleResponse(response);
-    if (data != null && data['token'] != null) {
-      await _saveToken(data['token']);
-    }
-    return data;
-  }
-  
-  // User signup
-  Future<Map<String, dynamic>> signup(String fullName, String email, String password) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$signupEndpoint'),
-      headers: await _buildHeaders(withAuth: false),
-      body: json.encode({
-        'fullName': fullName,
-        'email': email,
-        'password': password,
-      }),
-    );
-    
-    final data = _handleResponse(response);
-    if (data != null && data['token'] != null) {
-      await _saveToken(data['token']);
+    if (data != null && data['access'] != null && data['refresh'] != null) {
+      await _saveTokens(data['access'], data['refresh']);
     }
     return data;
   }
@@ -130,36 +181,65 @@ class ApiService {
   
   // User logout
   Future<void> logout() async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$logoutEndpoint'),
-      headers: await _buildHeaders(),
-    );
-    
-    _handleResponse(response);
-    await _clearToken();
+    await _clearTokens();
   }
   
   // User Profile APIs
   
   // Get user profile
   Future<Map<String, dynamic>> getUserProfile() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl$userProfileEndpoint'),
-      headers: await _buildHeaders(),
-    );
-    
-    return _handleResponse(response);
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$userProfileEndpoint'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.get(
+            Uri.parse('$baseUrl$userProfileEndpoint'),
+            headers: await _buildHeaders(),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Update user profile
   Future<Map<String, dynamic>> updateUserProfile(Map<String, dynamic> profileData) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$userProfileEndpoint'),
-      headers: await _buildHeaders(),
-      body: json.encode(profileData),
-    );
-    
-    return _handleResponse(response);
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl$userProfileEndpoint'),
+        headers: await _buildHeaders(),
+        body: json.encode(profileData),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.post(
+            Uri.parse('$baseUrl$userProfileEndpoint'),
+            headers: await _buildHeaders(),
+            body: json.encode(profileData),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Nutrition and Food APIs
@@ -167,23 +247,59 @@ class ApiService {
   // Get nutrition data (calories, macros, etc.)
   Future<Map<String, dynamic>> getNutritionData({String? date}) async {
     final dateParam = date != null ? '?date=$date' : '';
-    final response = await http.get(
-      Uri.parse('$baseUrl$nutritionDataEndpoint$dateParam'),
-      headers: await _buildHeaders(),
-    );
     
-    return _handleResponse(response);
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$nutritionDataEndpoint$dateParam'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.get(
+            Uri.parse('$baseUrl$nutritionDataEndpoint$dateParam'),
+            headers: await _buildHeaders(),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Add food entry
   Future<Map<String, dynamic>> addFoodEntry(Map<String, dynamic> foodData) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$foodEntriesEndpoint'),
-      headers: await _buildHeaders(),
-      body: json.encode(foodData),
-    );
-    
-    return _handleResponse(response);
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl$foodEntriesEndpoint'),
+        headers: await _buildHeaders(),
+        body: json.encode(foodData),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.post(
+            Uri.parse('$baseUrl$foodEntriesEndpoint'),
+            headers: await _buildHeaders(),
+            body: json.encode(foodData),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Get food entries
@@ -199,22 +315,57 @@ class ApiService {
       queryParams = '?mealType=$mealType';
     }
     
-    final response = await http.get(
-      Uri.parse('$baseUrl$foodEntriesEndpoint$queryParams'),
-      headers: await _buildHeaders(),
-    );
-    
-    return _handleResponse(response);
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$foodEntriesEndpoint$queryParams'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.get(
+            Uri.parse('$baseUrl$foodEntriesEndpoint$queryParams'),
+            headers: await _buildHeaders(),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Delete food entry
   Future<void> deleteFoodEntry(String entryId) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl$foodEntriesEndpoint/$entryId'),
-      headers: await _buildHeaders(),
-    );
-    
-    _handleResponse(response);
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl$foodEntriesEndpoint/$entryId'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.delete(
+            Uri.parse('$baseUrl$foodEntriesEndpoint/$entryId'),
+            headers: await _buildHeaders(),
+          );
+          _handleResponse(retryResponse);
+          return;
+        }
+      }
+      
+      _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Logs APIs
@@ -240,42 +391,118 @@ class ApiService {
       queryParams = '?endDate=$endDate';
     }
     
-    final response = await http.get(
-      Uri.parse('$baseUrl$logsEndpoint$queryParams'),
-      headers: await _buildHeaders(),
-    );
-    
-    return _handleResponse(response);
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$logsEndpoint$queryParams'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.get(
+            Uri.parse('$baseUrl$logsEndpoint$queryParams'),
+            headers: await _buildHeaders(),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Add log entry (weight, water, exercise)
   Future<Map<String, dynamic>> addLogEntry(Map<String, dynamic> logData) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$logsEndpoint'),
-      headers: await _buildHeaders(),
-      body: json.encode(logData),
-    );
-    
-    return _handleResponse(response);
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl$logsEndpoint'),
+        headers: await _buildHeaders(),
+        body: json.encode(logData),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.post(
+            Uri.parse('$baseUrl$logsEndpoint'),
+            headers: await _buildHeaders(),
+            body: json.encode(logData),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Delete log entry
   Future<void> deleteLogEntry(String logId) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl$logsEndpoint/$logId'),
-      headers: await _buildHeaders(),
-    );
-    
-    _handleResponse(response);
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl$logsEndpoint/$logId'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.delete(
+            Uri.parse('$baseUrl$logsEndpoint/$logId'),
+            headers: await _buildHeaders(),
+          );
+          _handleResponse(retryResponse);
+          return;
+        }
+      }
+      
+      _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
   }
   
   // Food search API
   Future<List<dynamic>> searchFoods(String query) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl$searchFoodsEndpoint?query=$query'),
-      headers: await _buildHeaders(),
-    );
-    
-    return _handleResponse(response);
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$searchFoodsEndpoint?query=$query'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.get(
+            Uri.parse('$baseUrl$searchFoodsEndpoint?query=$query'),
+            headers: await _buildHeaders(),
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      rethrow;
+    }
+  }
+  
+  // Check if user is logged in
+  Future<bool> isLoggedIn() async {
+    final token = await _getAccessToken();
+    return token != null;
   }
 } 
