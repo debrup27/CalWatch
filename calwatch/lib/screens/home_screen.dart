@@ -6,6 +6,8 @@ import 'logs_screen.dart';
 import 'profile_screen.dart';
 import 'add_food_screen.dart';
 import 'nutritionist_screen.dart';
+import '../services/api_service.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? username;
@@ -20,54 +22,51 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _selectedIndex = 0; // Diary selected by default
   late AnimationController _controller;
   DateTime _selectedDate = DateTime.now();
-  int _waterGlasses = 0;
+  bool _isLoading = true;
   
-  // Sample nutrition data
-  final Map<String, dynamic> _nutritionData = {
-    'caloriesConsumed': 1455,
-    'caloriesBurned': 468,
-    'calorieGoal': 1820,
+  // API service
+  late ApiService _apiService;
+  
+  // Nutrition data
+  Map<String, dynamic> _nutritionData = {
+    'calories': {
+      'consumed': 0.0,
+      'goal': 0.0,
+    },
+    'protein': {
+      'consumed': 0.0,
+      'goal': 0.0,
+    },
+    'carbohydrates': {
+      'consumed': 0.0,
+      'goal': 0.0,
+    },
+    'fat': {
+      'consumed': 0.0,
+      'goal': 0.0,
+    },
   };
 
-  // Sample food entries for the day
-  final List<Map<String, dynamic>> _foodEntries = [
-    {
-      'name': 'Pork chops, loin, fresh, visible fat eaten',
-      'time': '6:49 pm',
-      'amount': '2 oz',
-      'calories': 142.9,
-      'mealType': 'Dinner',
-    },
-    {
-      'name': 'Green Beans, Cooked from Fresh',
-      'time': '6:49 pm',
-      'amount': '1 cup, cut pieces',
-      'calories': 43.7,
-      'mealType': 'Dinner',
-    },
-    {
-      'name': 'Butter, Salted',
-      'time': '6:49 pm',
-      'amount': '1 tbsp',
-      'calories': 101.7,
-      'mealType': 'Dinner',
-    },
-    {
-      'name': 'Raspberries, Raw',
-      'time': '8:00 pm',
-      'amount': '0.5 cup, whole pieces',
-      'calories': 32.0,
-      'mealType': 'Snacks Evening',
-    },
-  ];
+  // Food entries for the day
+  List<Map<String, dynamic>> _foodEntries = [];
+  
+  // Date format
+  final _timeFormat = DateFormat('h:mm a');
 
   @override
   void initState() {
     super.initState();
+    _apiService = ApiService();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
+    
+    // Fetch data after widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchDailyData();
+    });
+    
     _controller.forward();
   }
   
@@ -75,6 +74,107 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+  
+  // Fetch daily data - both goals and consumption
+  Future<void> _fetchDailyData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Get today's date in YYYY-MM-DD format
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+      
+      // Fetch daily goals
+      final dailyGoals = await _apiService.getDailyGoals();
+      
+      // Fetch today's food logs
+      final foodLogs = await _apiService.getFoodLogs(today, tomorrow);
+      
+      // Calculate consumed nutrition values
+      double caloriesConsumed = 0.0;
+      double proteinConsumed = 0.0;
+      double carbsConsumed = 0.0;
+      double fatConsumed = 0.0;
+      
+      // Process food logs
+      final todayFoodEntries = <Map<String, dynamic>>[];
+      
+      for (final log in foodLogs) {
+        final timestamp = DateTime.parse(log['timestamp'] as String);
+        final logDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
+        
+        // Only include logs from today
+        if (logDate.isAtSameMomentAs(today)) {
+          // Add formatted time to the log
+          log['formatted_time'] = _timeFormat.format(timestamp);
+          
+          // Add to food entries for display
+          todayFoodEntries.add(log);
+          
+          // Sum up nutrients
+          caloriesConsumed += (log['calories'] as num?)?.toDouble() ?? 0.0;
+          proteinConsumed += (log['protein'] as num?)?.toDouble() ?? 0.0;
+          carbsConsumed += (log['carbohydrates'] as num?)?.toDouble() ?? 0.0;
+          fatConsumed += (log['fat'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+      
+      // Sort food entries by timestamp (newest first)
+      todayFoodEntries.sort((a, b) {
+        final aTime = DateTime.parse(a['timestamp'] as String);
+        final bTime = DateTime.parse(b['timestamp'] as String);
+        return bTime.compareTo(aTime);
+      });
+      
+      setState(() {
+        // Update nutrition data
+        _nutritionData = {
+          'calories': {
+            'consumed': caloriesConsumed,
+            'goal': dailyGoals['calories']?.toDouble() ?? 2000.0,
+          },
+          'protein': {
+            'consumed': proteinConsumed,
+            'goal': dailyGoals['protein']?.toDouble() ?? 50.0,
+          },
+          'carbohydrates': {
+            'consumed': carbsConsumed,
+            'goal': dailyGoals['carbohydrates']?.toDouble() ?? 250.0,
+          },
+          'fat': {
+            'consumed': fatConsumed,
+            'goal': dailyGoals['fat']?.toDouble() ?? 70.0,
+          },
+        };
+        
+        // Update food entries
+        _foodEntries = todayFoodEntries;
+        
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching daily data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to fetch daily data: $e',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
   
   void _handleNavigation(int index) {
@@ -113,12 +213,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     setState(() {
       _selectedDate = _selectedDate.subtract(const Duration(days: 1));
     });
+    _fetchDailyData();
   }
 
   void _nextDay() {
     setState(() {
       _selectedDate = _selectedDate.add(const Duration(days: 1));
     });
+    _fetchDailyData();
   }
 
   String _formatDate(DateTime date) {
@@ -127,12 +229,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-
-  void _addWaterGlass() {
-    setState(() {
-      _waterGlasses++;
-    });
   }
 
   @override
@@ -164,40 +260,61 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         centerTitle: true,
         backgroundColor: Colors.black,
         elevation: 1,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Calorie circles
-              _buildCalorieCircles(),
-              
-              const SizedBox(height: 24),
-              
-              // Water consumption using our new widget
-              WaterTrackerWidget(
-                onAddWater: _addWaterGlass,
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Food entries
-              ..._buildFoodEntries(),
-              
-              // Add padding at bottom for navigation bar
-              const SizedBox(height: 20),
-            ],
+        actions: [
+          // Refresh button
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _fetchDailyData,
           ),
-        ),
+        ],
       ),
+      body: _isLoading 
+          ? const Center(child: CircularProgressIndicator(color: Colors.green))
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Nutrient circles
+                    _buildNutrientCircles(),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Water consumption using our new widget
+                    WaterTrackerWidget(
+                      onAddWater: () {
+                        // Optional callback when water is added - could be used for showing a toast
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Water intake recorded!',
+                              style: GoogleFonts.poppins(),
+                            ),
+                            backgroundColor: Colors.blue,
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Food entries
+                    _buildFoodEntries(),
+                    
+                    // Add padding at bottom for navigation bar
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddFoodScreen()),
-          );
+          ).then((_) => _fetchDailyData()); // Refresh data when returning
         },
         backgroundColor: Colors.green,
         child: const Icon(Icons.add, color: Colors.white),
@@ -248,13 +365,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildCalorieCircles() {
-    final double caloriesConsumed = _nutritionData['caloriesConsumed'].toDouble();
-    final double caloriesBurned = _nutritionData['caloriesBurned'].toDouble();
-    final double calorieGoal = _nutritionData['calorieGoal'].toDouble();
-    final double consumedPercent = (caloriesConsumed / calorieGoal).clamp(0.0, 1.0);
-    final double burnedPercent = (caloriesBurned / calorieGoal).clamp(0.0, 1.0);
-    final double remainingPercent = ((calorieGoal - caloriesConsumed) / calorieGoal).clamp(0.0, 1.0);
+  Widget _buildNutrientCircles() {
+    // Get nutrient data
+    final caloriesConsumed = _nutritionData['calories']['consumed'] as double;
+    final caloriesGoal = _nutritionData['calories']['goal'] as double;
+    final proteinConsumed = _nutritionData['protein']['consumed'] as double;
+    final proteinGoal = _nutritionData['protein']['goal'] as double;
+    final carbsConsumed = _nutritionData['carbohydrates']['consumed'] as double;
+    final carbsGoal = _nutritionData['carbohydrates']['goal'] as double;
+    final fatConsumed = _nutritionData['fat']['consumed'] as double;
+    final fatGoal = _nutritionData['fat']['goal'] as double;
+    
+    // Calculate percentages
+    final caloriesPercent = (caloriesConsumed / caloriesGoal).clamp(0.0, 1.0);
+    final proteinPercent = (proteinConsumed / proteinGoal).clamp(0.0, 1.0);
+    final carbsPercent = (carbsConsumed / carbsGoal).clamp(0.0, 1.0);
+    final fatPercent = (fatConsumed / fatGoal).clamp(0.0, 1.0);
     
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -283,7 +409,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Calories',
+            'Nutrition Tracker',
             style: GoogleFonts.poppins(
               color: Colors.white,
               fontSize: 18,
@@ -294,20 +420,37 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildCalorieCircle(
-                'Consumed',
+              _buildNutrientCircle(
+                'Calories',
                 caloriesConsumed.toInt(),
-                consumedPercent,
+                caloriesGoal.toInt(),
+                caloriesPercent,
+                Colors.blue,
+                'kcal',
               ),
-              _buildCalorieCircle(
-                'Burned',
-                caloriesBurned.toInt(),
-                burnedPercent,
+              _buildNutrientCircle(
+                'Protein',
+                proteinConsumed.toInt(),
+                proteinGoal.toInt(),
+                proteinPercent,
+                Colors.red,
+                'g',
               ),
-              _buildCalorieCircle(
-                'Remaining',
-                (calorieGoal - caloriesConsumed).toInt(),
-                remainingPercent,
+              _buildNutrientCircle(
+                'Carbs',
+                carbsConsumed.toInt(),
+                carbsGoal.toInt(),
+                carbsPercent,
+                Colors.green,
+                'g',
+              ),
+              _buildNutrientCircle(
+                'Fat',
+                fatConsumed.toInt(),
+                fatGoal.toInt(),
+                fatPercent,
+                Colors.yellow,
+                'g',
               ),
             ],
           ),
@@ -316,30 +459,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
   
-  Widget _buildCalorieCircle(String label, int value, double percent) {
+  Widget _buildNutrientCircle(String label, int consumed, int goal, double percent, Color color, String unit) {
     return Column(
       children: [
         AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
             return CircularPercentIndicator(
-              radius: 40.0,
-              lineWidth: 8.0,
+              radius: 35.0,
+              lineWidth: 6.0,
               animation: false,
               percent: percent * _controller.value,
               center: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '$value',
+                    '$consumed',
                     style: GoogleFonts.montserrat(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 14,
                       color: Colors.white,
                     ),
                   ),
                   Text(
-                    'kcal',
+                    unit,
                     style: GoogleFonts.montserrat(
                       fontSize: 10,
                       color: Colors.grey[400],
@@ -347,8 +490,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                 ],
               ),
+              footer: Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  'Goal: $goal',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 10,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ),
               circularStrokeCap: CircularStrokeCap.round,
-              progressColor: _getColorForLabel(label),
+              progressColor: color,
               backgroundColor: Colors.grey[800] ?? Colors.grey.shade800,
             );
           },
@@ -357,30 +510,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         Text(
           label,
           style: GoogleFonts.montserrat(
-            fontSize: 14,
+            fontSize: 12,
             color: Colors.white70,
           ),
         ),
       ],
     );
   }
-  
-  Color _getColorForLabel(String label) {
-    switch (label) {
-      case 'Consumed':
-        return Colors.blue;
-      case 'Burned':
-        return Colors.green;
-      case 'Remaining':
-        return Colors.purple;
-      default:
-        return Colors.white;
-    }
-  }
 
-  List<Widget> _buildFoodEntries() {
+  Widget _buildFoodEntries() {
     List<Widget> widgets = [];
-    String currentMealType = '';
     
     widgets.add(
       Container(
@@ -436,35 +575,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
     
-    return widgets;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
   }
   
   Widget _buildFoodEntriesContent() {
-    List<Widget> widgets = [];
-    String currentMealType = '';
-    
-    for (final entry in _foodEntries) {
-      if (entry['mealType'] != currentMealType) {
-        currentMealType = entry['mealType'] as String;
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0, top: 16.0),
-            child: Text(
-              currentMealType,
-              style: GoogleFonts.montserrat(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        );
-      }
-      
-      widgets.add(_buildFoodEntryItem(entry));
-    }
-    
-    if (widgets.isEmpty) {
+    if (_foodEntries.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -479,9 +597,51 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       );
     }
     
+    // Group foods by meal type if possible
+    final Map<String, List<Map<String, dynamic>>> mealGroups = {};
+    
+    for (final entry in _foodEntries) {
+      final mealType = entry['meal_type'] ?? 'Other';
+      if (!mealGroups.containsKey(mealType)) {
+        mealGroups[mealType] = [];
+      }
+      mealGroups[mealType]!.add(entry);
+    }
+    
+    if (mealGroups.isEmpty) {
+      // No meal type grouping, just show the list
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: _foodEntries.map((entry) => _buildFoodEntryItem(entry)).toList(),
+      );
+    }
+    
+    // Build entries grouped by meal type
+    final List<Widget> groupedEntries = [];
+    
+    mealGroups.forEach((mealType, entries) {
+      groupedEntries.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0, top: 16.0),
+          child: Text(
+            mealType,
+            style: GoogleFonts.montserrat(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+      
+      for (final entry in entries) {
+        groupedEntries.add(_buildFoodEntryItem(entry));
+      }
+    });
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: widgets,
+      children: groupedEntries,
     );
   }
   
@@ -502,7 +662,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  entry['name'],
+                  entry['food_name'] ?? 'Unknown Food',
                   style: GoogleFonts.montserrat(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -511,7 +671,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${entry['time']} ${entry['amount']}',
+                  entry['formatted_time'] ?? '',
                   style: GoogleFonts.montserrat(
                     fontSize: 12,
                     color: Colors.grey[400],
@@ -521,7 +681,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
           Text(
-            '${entry['calories']} kcal',
+            '${(entry['calories'] as num?)?.toStringAsFixed(1) ?? 'N/A'} kcal',
             style: GoogleFonts.montserrat(
               fontSize: 14,
               fontWeight: FontWeight.w500,

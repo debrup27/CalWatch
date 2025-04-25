@@ -58,7 +58,10 @@ class _SignupScreenState extends State<SignupScreen> {
             if (mounted) {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const UserDetailsScreen()),
+                MaterialPageRoute(builder: (context) => UserDetailsScreen(
+                  userDetails: {},
+                  isNewUser: true,
+                )),
               );
             }
           });

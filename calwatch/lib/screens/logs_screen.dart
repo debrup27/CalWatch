@@ -5,6 +5,8 @@ import 'home_screen.dart';
 import 'nutritionist_screen.dart';
 import 'profile_screen.dart';
 import 'dart:ui';
+import '../services/api_service.dart';
+import 'package:intl/intl.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({Key? key}) : super(key: key);
@@ -18,24 +20,19 @@ class _LogsScreenState extends State<LogsScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  bool _isLoading = true;
   
-  // Sample log data - in a real app, this would come from a database or API
-  final Map<DateTime, List<Map<String, dynamic>>> _logEvents = {
-    DateTime.now(): [
-      {'title': 'Breakfast', 'calories': 450, 'time': '8:30 AM'},
-      {'title': 'Lunch', 'calories': 700, 'time': '12:45 PM'},
-      {'title': 'Water', 'amount': '500ml', 'time': '2:00 PM'},
-    ],
-    DateTime.now().subtract(const Duration(days: 1)): [
-      {'title': 'Breakfast', 'calories': 350, 'time': '9:00 AM'},
-      {'title': 'Dinner', 'calories': 850, 'time': '7:30 PM'},
-    ],
-    DateTime.now().subtract(const Duration(days: 2)): [
-      {'title': 'Lunch', 'calories': 600, 'time': '1:15 PM'},
-      {'title': 'Snack', 'calories': 200, 'time': '4:00 PM'},
-      {'title': 'Water', 'amount': '750ml', 'time': '5:30 PM'},
-    ],
-  };
+  // Map to store fetched logs by date
+  Map<DateTime, List<Map<String, dynamic>>> _logEvents = {};
+  
+  // Combined map for both food and water logs
+  Map<DateTime, List<Map<String, dynamic>>> _combinedLogs = {};
+  
+  // ApiService instance
+  late ApiService _apiService;
+  
+  // Format dates
+  final _dateFormat = DateFormat('h:mm a');
 
   void _handleNavigation(int index) {
     if (index == _selectedIndex) return;
@@ -69,20 +66,148 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
+  // Get start and end dates based on current calendar view
+  Map<String, DateTime> _getDateRange() {
+    DateTime start, end;
+    
+    switch (_calendarFormat) {
+      case CalendarFormat.month:
+        // For month view, get first and last day of the month
+        final DateTime firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
+        final DateTime lastDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
+        start = firstDayOfMonth;
+        end = lastDayOfMonth;
+        break;
+        
+      case CalendarFormat.twoWeeks:
+        // For two weeks view, get 7 days before and 7 days after focused day
+        start = _focusedDay.subtract(const Duration(days: 7));
+        end = _focusedDay.add(const Duration(days: 7));
+        break;
+        
+      case CalendarFormat.week:
+      default:
+        // For week view, get start and end of the week
+        int difference = _focusedDay.weekday - 1; // 0 for Monday, 6 for Sunday
+        start = _focusedDay.subtract(Duration(days: difference));
+        end = start.add(const Duration(days: 6));
+        break;
+    }
+    
+    return {'start': start, 'end': end};
+  }
+  
+  // Fetch logs for the current view
+  Future<void> _fetchLogs() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final dateRange = _getDateRange();
+      final startDate = dateRange['start']!;
+      final endDate = dateRange['end']!;
+      
+      print('Fetching logs from $startDate to $endDate');
+      
+      // Fetch food logs
+      final foodLogs = await _apiService.getFoodLogs(startDate, endDate);
+      
+      // Fetch water logs (optional - if you want to include this as well)
+      final waterLogs = await _apiService.getWaterIntake();
+      
+      // Reset the combined logs map
+      final newCombinedLogs = <DateTime, List<Map<String, dynamic>>>{};
+      
+      // Process food logs
+      for (final log in foodLogs) {
+        final timestamp = DateTime.parse(log['timestamp'] as String);
+        final day = DateTime(timestamp.year, timestamp.month, timestamp.day);
+        
+        if (!newCombinedLogs.containsKey(day)) {
+          newCombinedLogs[day] = [];
+        }
+        
+        // Add formatted time to the log
+        log['formatted_time'] = _dateFormat.format(timestamp);
+        log['type'] = 'food';
+        
+        newCombinedLogs[day]!.add(log);
+      }
+      
+      // Process water logs - only those in our date range
+      for (final log in waterLogs) {
+        final timestamp = DateTime.parse(log['timestamp'] as String);
+        final day = DateTime(timestamp.year, timestamp.month, timestamp.day);
+        
+        // Check if within date range
+        if (day.compareTo(startDate) >= 0 && day.compareTo(endDate) <= 0) {
+          if (!newCombinedLogs.containsKey(day)) {
+            newCombinedLogs[day] = [];
+          }
+          
+          // Add formatted time to the log
+          log['formatted_time'] = _dateFormat.format(timestamp);
+          log['type'] = 'water';
+          
+          newCombinedLogs[day]!.add(log);
+        }
+      }
+      
+      // Sort logs by timestamp for each day
+      for (final day in newCombinedLogs.keys) {
+        newCombinedLogs[day]!.sort((a, b) {
+          final aTime = DateTime.parse(a['timestamp'] as String);
+          final bTime = DateTime.parse(b['timestamp'] as String);
+          return bTime.compareTo(aTime); // Descending order (newest first)
+        });
+      }
+      
+      setState(() {
+        _combinedLogs = newCombinedLogs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching logs: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      
+      // Show error snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to fetch logs: $e',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   List<Map<String, dynamic>> _getEventsForDay(DateTime day) {
-    return _logEvents[DateTime(day.year, day.month, day.day)] ?? [];
+    // Normalize the day to remove time component
+    final normalizedDay = DateTime(day.year, day.month, day.day);
+    return _combinedLogs[normalizedDay] ?? [];
   }
 
   @override
   void initState() {
     super.initState();
+    _apiService = ApiService();
     _selectedDay = _focusedDay;
+    
+    // Fetch logs after the widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchLogs();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -96,12 +221,27 @@ class _LogsScreenState extends State<LogsScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          // Refresh button
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _fetchLogs,
+          ),
+        ],
       ),
       body: Column(
         children: [
           _buildCalendar(),
           const SizedBox(height: 20),
-          _buildLogsList(),
+          _isLoading 
+              ? const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.green,
+                    ),
+                  ),
+                )
+              : _buildLogsList(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -193,10 +333,18 @@ class _LogsScreenState extends State<LogsScreen> {
                   setState(() {
                     _calendarFormat = format;
                   });
+                  
+                  // Fetch logs with new date range
+                  _fetchLogs();
                 }
               },
               onPageChanged: (focusedDay) {
-                _focusedDay = focusedDay;
+                setState(() {
+                  _focusedDay = focusedDay;
+                });
+                
+                // Fetch logs with new date range
+                _fetchLogs();
               },
               calendarStyle: CalendarStyle(
                 todayDecoration: BoxDecoration(
@@ -263,6 +411,9 @@ class _LogsScreenState extends State<LogsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemBuilder: (context, index) {
           final event = events[index];
+          final isFood = event['type'] == 'food';
+          final isWater = event['type'] == 'water';
+          
           return Card(
             color: Colors.grey[850],
             elevation: 2,
@@ -270,32 +421,150 @@ class _LogsScreenState extends State<LogsScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: ListTile(
               title: Text(
-                event['title'],
+                isFood 
+                    ? (event['food_name'] ?? 'Unknown Food')
+                    : 'Water Intake',
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               subtitle: Text(
-                event.containsKey('calories') 
-                    ? 'Calories: ${event['calories']} • ${event['time']}'
-                    : 'Water: ${event['amount']} • ${event['time']}',
+                isFood
+                    ? 'Calories: ${event['calories']?.toStringAsFixed(1) ?? 'N/A'} • ${event['formatted_time']}'
+                    : 'Amount: ${event['amount']?.toStringAsFixed(0) ?? 'N/A'} ml • ${event['formatted_time']}',
                 style: GoogleFonts.poppins(
                   color: Colors.grey[400],
                 ),
               ),
               leading: CircleAvatar(
-                backgroundColor: event.containsKey('calories') ? Colors.orange : Colors.blue,
+                backgroundColor: isFood ? Colors.orange : Colors.blue,
                 child: Icon(
-                  event.containsKey('calories') ? Icons.restaurant : Icons.water_drop,
+                  isFood ? Icons.restaurant : Icons.water_drop,
                   color: Colors.white,
                 ),
               ),
-              trailing: const Icon(Icons.more_vert, color: Colors.white),
+              trailing: isFood ? PopupMenuButton(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'details',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Details',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                color: Colors.grey[900],
+                onSelected: (value) {
+                  if (value == 'details') {
+                    _showFoodDetails(event);
+                  }
+                },
+              ) : null,
             ),
           );
         },
       ),
+    );
+  }
+  
+  void _showFoodDetails(Map<String, dynamic> food) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                food['food_name'] ?? 'Unknown Food',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Consumed on ${food['formatted_time']}',
+                style: GoogleFonts.poppins(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Divider(color: Colors.grey),
+              const SizedBox(height: 16),
+              _buildNutrientRow('Calories', '${food['calories']?.toStringAsFixed(1) ?? 'N/A'} kcal', Colors.orange),
+              const SizedBox(height: 12),
+              _buildNutrientRow('Protein', '${food['protein']?.toStringAsFixed(1) ?? 'N/A'} g', Colors.red),
+              const SizedBox(height: 12),
+              _buildNutrientRow('Carbs', '${food['carbohydrates']?.toStringAsFixed(1) ?? 'N/A'} g', Colors.blue),
+              const SizedBox(height: 12),
+              _buildNutrientRow('Fat', '${food['fat']?.toStringAsFixed(1) ?? 'N/A'} g', Colors.yellow),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  Widget _buildNutrientRow(String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            color: Colors.grey[300],
+            fontSize: 16,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 } 

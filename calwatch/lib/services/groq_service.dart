@@ -103,9 +103,14 @@ class GroqService {
         final content = data['choices'][0]['message']['content'];
         return content;
       } else {
-        throw Exception('Failed to get response from Groq API: ${response.statusCode} ${response.reasonPhrase}');
+        final errorBody = response.body.isNotEmpty ? jsonDecode(response.body) : {'error': 'Unknown error'};
+        final errorMessage = errorBody['error']?['message'] ?? 'Unknown error: ${response.statusCode}';
+        throw Exception('Failed to get response from Groq API: $errorMessage');
       }
     } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
       throw Exception('Error communicating with Groq API: ${e.toString()}');
     }
   }

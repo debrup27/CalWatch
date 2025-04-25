@@ -7,6 +7,9 @@ from .serializers import DailyGoalSerializer, WaterIntakeSerializer, FoodConsump
 from .food_data import search_food, get_food_by_index, get_food_by_id
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 # Create your views here.
 
@@ -134,3 +137,34 @@ class AddFoodView(generics.CreateAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except ValueError:
             return Response({"detail": "Invalid data format"}, status=status.HTTP_400_BAD_REQUEST)
+
+class FoodConsumptionListByDateView(generics.ListAPIView):
+    """API endpoint to list food consumption by date range"""
+    serializer_class = FoodConsumptionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        
+        if not start_date or not end_date:
+            raise ValidationError("Both start_date and end_date are required query parameters")
+
+        try:
+            start_datetime = parse_datetime(start_date)
+            end_datetime = parse_datetime(end_date)
+            
+            if not start_datetime:
+                start_datetime = timezone.make_aware(timezone.datetime.strptime(start_date, "%Y-%m-%d"))
+            if not end_datetime:
+                end_datetime = timezone.make_aware(timezone.datetime.strptime(end_date, "%Y-%m-%d"))
+                end_datetime = end_datetime.replace(hour=23, minute=59, second=59)
+        
+        except (ValueError, TypeError):
+            raise ValidationError("Invalid date format. Use YYYY-MM-DD or YYYY-MM-DDThh:mm:ss format")
+        
+        return FoodConsumption.objects.filter(
+            user=self.request.user,
+            timestamp__gte=start_datetime, 
+            timestamp__lte=end_datetime
+        ).order_by('timestamp')
