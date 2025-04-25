@@ -8,6 +8,9 @@ import 'login_screen.dart';
 import '../services/api_service.dart';
 import 'edit_profile_screen.dart';
 import 'user_details_screen.dart';
+import 'streak_debug_screen.dart';
+import 'wallet_setup_screen.dart';
+import 'contract_setup_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -198,16 +201,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _navigateToEditProfile() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EditProfileScreen(
-          username: _username,
-          email: _email,
-          firstName: _firstName,
-          lastName: _lastName,
-          bio: _bio,
-        ),
-      ),
-    ).then((_) => _fetchUserData()); // Refresh data when returning
+      MaterialPageRoute(builder: (context) => EditProfileScreen(
+        username: _username,
+        email: _email,
+        firstName: _firstName,
+        lastName: _lastName,
+        bio: _bio,
+      )),
+    ).then((_) {
+      // Refresh user data when returning from edit screen
+      _fetchUserData();
+    });
   }
   
   void _navigateToUserDetails() {
@@ -219,6 +223,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     ).then((_) => _fetchUserData()); // Refresh data when returning
+  }
+
+  void _navigateToDebugStreak() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const StreakDebugScreen()),
+    );
+  }
+  
+  void _navigateToWalletSetup() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const WalletSetupScreen()),
+    );
+  }
+  
+  void _navigateToContractSetup() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ContractSetupScreen()),
+    );
   }
 
   @override
@@ -937,6 +962,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildSettingItem(Icons.notifications_outlined, 'Notifications'),
           _buildSettingItem(Icons.lock_outline, 'Privacy'),
           _buildSettingItem(Icons.help_outline, 'Help & Support'),
+          _buildSettingItem(Icons.bug_report, 'Debug Streak'),
+          _buildSettingItem(Icons.account_balance_wallet, 'Wallet Setup'),
+          _buildSettingItem(Icons.receipt_long, 'Contract Setup'),
           _buildSettingItem(Icons.info_outline, 'About'),
           _buildSettingItem(Icons.logout, 'Sign Out', isDestructive: true),
         ],
@@ -960,6 +988,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               break;
             case 'Help & Support':
               // Navigate to help & support
+              break;
+            case 'Debug Streak':
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StreakDebugScreen()),
+              );
+              break;
+            case 'Wallet Setup':
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const WalletSetupScreen()),
+              );
+              break;
+            case 'Contract Setup':
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ContractSetupScreen()),
+              );
               break;
             case 'About':
               // Show about dialog

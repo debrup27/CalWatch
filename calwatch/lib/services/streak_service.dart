@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'monad_service.dart';
 
 class StreakService {
   // Singleton pattern
@@ -13,6 +14,8 @@ class StreakService {
   static const String _streakHistoryKey = 'streak_history';
   static const String _penaltyActiveKey = 'penalty_active';
   static const String _missedDateKey = 'missed_date';
+  static const String _blockchainRecordsKey = 'blockchain_records';
+  static const String _lastSyncDateKey = 'last_blockchain_sync_date';
   
   // Daily goal tolerance range
   static const int _nutrientToleranceRange = 50;
@@ -21,6 +24,49 @@ class StreakService {
   Future<int> getStreakCount() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_streakCountKey) ?? 0;
+  }
+  
+  // Sync local streak with blockchain if needed
+  Future<void> syncWithBlockchain() async {
+    try {
+      final monadService = MonadService();
+      
+      // Check if wallet is set up
+      final isWalletSetup = await monadService.isWalletSetup();
+      if (!isWalletSetup) {
+        print('Wallet not set up, skipping blockchain sync');
+        return;
+      }
+      
+      // Initialize blockchain service
+      await monadService.initialize();
+      
+      // Get blockchain streak
+      final blockchainStreak = await monadService.getStreakFromContract();
+      
+      // Get local streak
+      final localStreak = await getStreakCount();
+      
+      // Get last action day from blockchain
+      final lastActionDay = await monadService.getLastActionDayFromContract();
+      
+      // Get current day
+      final today = DateTime.now().millisecondsSinceEpoch ~/ (1000 * 60 * 60 * 24);
+      
+      print('Blockchain streak: $blockchainStreak, Local streak: $localStreak, Last action day: $lastActionDay, Today: $today');
+      
+      // Update local streak if blockchain has a newer record
+      final prefs = await SharedPreferences.getInstance();
+      if (blockchainStreak != localStreak) {
+        await prefs.setInt(_streakCountKey, blockchainStreak);
+        print('Updated local streak from blockchain: $blockchainStreak');
+      }
+      
+      // Record last sync date
+      await prefs.setString(_lastSyncDateKey, DateTime.now().toIso8601String());
+    } catch (e) {
+      print('Error syncing with blockchain: $e');
+    }
   }
   
   // Get last streak date
@@ -92,6 +138,9 @@ class StreakService {
   
   // Update streak based on today's nutrition data
   Future<Map<String, dynamic>> updateStreak(Map<String, dynamic> nutritionData) async {
+    // First sync with blockchain to make sure we have the latest streak data
+    await syncWithBlockchain();
+    
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -159,6 +208,15 @@ class StreakService {
         
         // Update streak history
         _updateStreakHistory(today, newStreak);
+        
+        // Record on blockchain if streak changed (only if goals were met)
+        final blockchainRecord = await _recordStreakOnBlockchain(newStreak, goalsMet, today);
+        if (blockchainRecord != null) {
+          _saveBlockchainRecord(today, newStreak, blockchainRecord);
+          
+          // After recording, sync again to ensure we have latest blockchain data
+          await syncWithBlockchain();
+        }
       }
     } else {
       // Goals were NOT met today
@@ -175,16 +233,112 @@ class StreakService {
         
         // Update streak history
         _updateStreakHistory(today, newStreak);
+        
+        // No need to record to blockchain - streak breaks are handled automatically
+        // by the smart contract when the next recordAction is called
       }
+    }
+    
+    // Check if we have any blockchain records
+    final blockchainRecords = await getBlockchainRecords();
+    
+    // Get current streak from blockchain (may differ from local)
+    int onChainStreak = newStreak;
+    bool hasWallet = false;
+    try {
+      final monadService = MonadService();
+      hasWallet = await monadService.isWalletSetup();
+      if (hasWallet) {
+        await monadService.initialize();
+        onChainStreak = await monadService.getStreakFromContract();
+      }
+    } catch (e) {
+      print('Error getting blockchain streak: $e');
     }
     
     return {
       'streakCount': newStreak,
+      'blockchainStreak': onChainStreak,
       'isOnStreak': await isOnStreak(),
       'streakChanged': streakChanged,
       'goalsMet': goalsMet,
-      'penaltyActive': await isPenaltyActive()
+      'penaltyActive': await isPenaltyActive(),
+      'hasBlockchainRecords': blockchainRecords.isNotEmpty,
+      'latestBlockchainRecord': blockchainRecords.isNotEmpty ? blockchainRecords.last : null,
+      'walletSetup': hasWallet,
     };
+  }
+  
+  // Record streak on blockchain (if wallet is set up)
+  Future<Map<String, dynamic>?> _recordStreakOnBlockchain(int streakCount, bool goalsMet, DateTime date) async {
+    try {
+      final monadService = MonadService();
+      
+      // Check if wallet is set up
+      final isWalletSetup = await monadService.isWalletSetup();
+      if (!isWalletSetup) {
+        print('Wallet not set up, skipping blockchain recording');
+        return null;
+      }
+      
+      // Initialize blockchain service
+      await monadService.initialize();
+      
+      // Record streak
+      final txHash = await monadService.recordStreak(streakCount, goalsMet, date);
+      
+      // Return transaction details
+      final address = await monadService.getWalletAddress();
+      
+      return {
+        'txHash': txHash,
+        'walletAddress': address,
+        'streakCount': streakCount,
+        'goalsMet': goalsMet,
+        'timestamp': DateTime.now().toIso8601String(),
+        'recordedDate': date.toIso8601String(),
+      };
+    } catch (e) {
+      print('Error recording streak on blockchain: $e');
+      return null;
+    }
+  }
+  
+  // Save blockchain record
+  Future<void> _saveBlockchainRecord(DateTime date, int streakCount, Map<String, dynamic> record) async {
+    final prefs = await SharedPreferences.getInstance();
+    final recordsJson = prefs.getString(_blockchainRecordsKey);
+    
+    List<Map<String, dynamic>> records = [];
+    if (recordsJson != null) {
+      final decoded = json.decode(recordsJson) as List<dynamic>;
+      records = decoded.map<Map<String, dynamic>>((item) => Map<String, dynamic>.from(item)).toList();
+    }
+    
+    // Add new record
+    records.add(record);
+    
+    // Store records
+    await prefs.setString(_blockchainRecordsKey, json.encode(records));
+  }
+  
+  // Get blockchain records
+  Future<List<Map<String, dynamic>>> getBlockchainRecords() async {
+    final prefs = await SharedPreferences.getInstance();
+    final recordsJson = prefs.getString(_blockchainRecordsKey);
+    
+    if (recordsJson == null) return [];
+    
+    final decoded = json.decode(recordsJson) as List<dynamic>;
+    return decoded.map<Map<String, dynamic>>((item) => Map<String, dynamic>.from(item)).toList();
+  }
+  
+  // Get last blockchain sync date
+  Future<DateTime?> getLastSyncDate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dateString = prefs.getString(_lastSyncDateKey);
+    if (dateString == null) return null;
+    return DateTime.parse(dateString);
   }
   
   // Update streak history in shared preferences
@@ -248,5 +402,183 @@ class StreakService {
     await prefs.remove(_lastStreakDateKey);
     await prefs.remove(_penaltyActiveKey);
     await prefs.remove(_missedDateKey);
+    
+    // Try to sync with blockchain to reset to blockchain state
+    await syncWithBlockchain();
+  }
+  
+  // DEBUGGING METHODS
+  
+  // Force increment streak by a given amount (for debugging)
+  Future<Map<String, dynamic>> debugIncrementStreak([int amount = 1]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentStreak = await getStreakCount();
+    final newStreak = currentStreak + amount;
+    
+    await prefs.setInt(_streakCountKey, newStreak);
+    
+    // Update last streak date to today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    await prefs.setString(_lastStreakDateKey, today.toIso8601String());
+    
+    // Update streak history
+    _updateStreakHistory(today, newStreak);
+    
+    // Record on blockchain if possible
+    final blockchainRecord = await _recordStreakOnBlockchain(newStreak, true, today);
+    if (blockchainRecord != null) {
+      _saveBlockchainRecord(today, newStreak, blockchainRecord);
+    }
+    
+    return {
+      'previousStreak': currentStreak,
+      'newStreak': newStreak,
+      'change': amount,
+      'date': today.toIso8601String(),
+      'blockchainRecord': blockchainRecord
+    };
+  }
+  
+  // Force update streak from blockchain for debugging
+  Future<Map<String, dynamic>> debugSyncWithBlockchain() async {
+    final beforeStreak = await getStreakCount();
+    await syncWithBlockchain();
+    final afterStreak = await getStreakCount();
+    
+    return {
+      'beforeSync': beforeStreak,
+      'afterSync': afterStreak,
+      'changed': beforeStreak != afterStreak,
+      'syncDate': DateTime.now().toIso8601String(),
+    };
+  }
+  
+  // Force decrement streak by a given amount (for debugging)
+  Future<Map<String, dynamic>> debugDecrementStreak([int amount = 1]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentStreak = await getStreakCount();
+    final newStreak = (currentStreak - amount) < 0 ? 0 : currentStreak - amount;
+    
+    await prefs.setInt(_streakCountKey, newStreak);
+    
+    // Update last streak date to today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    await prefs.setString(_lastStreakDateKey, today.toIso8601String());
+    
+    // Update streak history
+    _updateStreakHistory(today, newStreak);
+    
+    // Record on blockchain if possible
+    final blockchainRecord = await _recordStreakOnBlockchain(newStreak, false, today);
+    if (blockchainRecord != null) {
+      _saveBlockchainRecord(today, newStreak, blockchainRecord);
+    }
+    
+    return {
+      'previousStreak': currentStreak,
+      'newStreak': newStreak,
+      'change': -amount,
+      'date': today.toIso8601String(),
+      'blockchainRecord': blockchainRecord
+    };
+  }
+  
+  // Set streak to a specific value (for debugging)
+  Future<Map<String, dynamic>> debugSetStreak(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentStreak = await getStreakCount();
+    final newStreak = value < 0 ? 0 : value;
+    
+    await prefs.setInt(_streakCountKey, newStreak);
+    
+    // Update last streak date to today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    await prefs.setString(_lastStreakDateKey, today.toIso8601String());
+    
+    // Update streak history
+    _updateStreakHistory(today, newStreak);
+    
+    // Record on blockchain if possible
+    final blockchainRecord = await _recordStreakOnBlockchain(newStreak, true, today);
+    if (blockchainRecord != null) {
+      _saveBlockchainRecord(today, newStreak, blockchainRecord);
+    }
+    
+    return {
+      'previousStreak': currentStreak,
+      'newStreak': newStreak,
+      'change': newStreak - currentStreak,
+      'date': today.toIso8601String(),
+      'blockchainRecord': blockchainRecord
+    };
+  }
+  
+  // Toggle penalty status (for debugging)
+  Future<Map<String, dynamic>> debugTogglePenalty() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentPenalty = await isPenaltyActive();
+    
+    await prefs.setBool(_penaltyActiveKey, !currentPenalty);
+    
+    // If activating penalty, set missed date to yesterday
+    if (!currentPenalty) {
+      final now = DateTime.now();
+      final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+      await prefs.setString(_missedDateKey, yesterday.toIso8601String());
+    }
+    
+    return {
+      'previousPenaltyStatus': currentPenalty,
+      'newPenaltyStatus': !currentPenalty,
+      'missedDate': !currentPenalty ? DateTime.now().subtract(const Duration(days: 1)).toIso8601String() : null
+    };
+  }
+  
+  // Get complete debug info (for debugging)
+  Future<Map<String, dynamic>> debugGetStreakInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final streakCount = await getStreakCount();
+    final lastStreakDate = await getLastStreakDate();
+    final isPenalty = await isPenaltyActive();
+    final missedDate = await getMissedDate();
+    final streakHistory = await getStreakHistory();
+    final blockchainRecords = await getBlockchainRecords();
+    final lastSyncDate = await getLastSyncDate();
+    
+    // Try to get blockchain streak
+    int? blockchainStreak;
+    try {
+      final monadService = MonadService();
+      final hasWallet = await monadService.isWalletSetup();
+      if (hasWallet) {
+        await monadService.initialize();
+        blockchainStreak = await monadService.getStreakFromContract();
+      }
+    } catch (e) {
+      print('Error getting blockchain streak: $e');
+    }
+    
+    return {
+      'streakCount': streakCount,
+      'blockchainStreak': blockchainStreak,
+      'lastStreakDate': lastStreakDate?.toIso8601String(),
+      'isPenaltyActive': isPenalty,
+      'missedDate': missedDate?.toIso8601String(),
+      'streakHistory': streakHistory,
+      'isOnStreak': await isOnStreak(),
+      'hasWallet': await MonadService().isWalletSetup(),
+      'blockchainRecords': blockchainRecords,
+      'lastSyncDate': lastSyncDate?.toIso8601String(),
+      'rawKeys': {
+        'streakCountKey': prefs.getInt(_streakCountKey),
+        'lastStreakDateKey': prefs.getString(_lastStreakDateKey),
+        'penaltyActiveKey': prefs.getBool(_penaltyActiveKey),
+        'missedDateKey': prefs.getString(_missedDateKey),
+        'lastSyncDateKey': prefs.getString(_lastSyncDateKey),
+      }
+    };
   }
 } 
