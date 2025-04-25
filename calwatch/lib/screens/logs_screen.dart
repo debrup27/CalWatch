@@ -263,7 +263,7 @@ class _LogsScreenState extends State<LogsScreen> {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline),
-              label: 'Nutritionist',
+              label: 'Padma',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today),

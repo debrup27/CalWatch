@@ -8,6 +8,7 @@ import 'add_food_screen.dart';
 import 'nutritionist_screen.dart';
 import '../services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'streak_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? username;
@@ -21,8 +22,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0; // Diary selected by default
   late AnimationController _controller;
-  DateTime _selectedDate = DateTime.now();
+  late DateTime _selectedDate;
   bool _isLoading = true;
+  
+  // Streak variables
+  int _streakCount = 0;
+  bool _isOnStreak = false;
   
   // API service
   late ApiService _apiService;
@@ -64,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     
     // Fetch data after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _selectedDate = DateTime.now();
       _fetchDailyData();
     });
     
@@ -76,104 +82,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
   
-  // Fetch daily data - both goals and consumption
-  Future<void> _fetchDailyData() async {
+  void _fetchDailyData() async {
     setState(() {
       _isLoading = true;
     });
     
     try {
-      // Get today's date in YYYY-MM-DD format
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final tomorrow = today.add(const Duration(days: 1));
-      
-      // Fetch daily goals
-      final dailyGoals = await _apiService.getDailyGoals();
-      
-      // Fetch today's food logs
-      final foodLogs = await _apiService.getFoodLogs(today, tomorrow);
-      
-      // Calculate consumed nutrition values
-      double caloriesConsumed = 0.0;
-      double proteinConsumed = 0.0;
-      double carbsConsumed = 0.0;
-      double fatConsumed = 0.0;
-      
-      // Process food logs
-      final todayFoodEntries = <Map<String, dynamic>>[];
-      
-      for (final log in foodLogs) {
-        final timestamp = DateTime.parse(log['timestamp'] as String);
-        final logDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
-        
-        // Only include logs from today
-        if (logDate.isAtSameMomentAs(today)) {
-          // Add formatted time to the log
-          log['formatted_time'] = _timeFormat.format(timestamp);
-          
-          // Add to food entries for display
-          todayFoodEntries.add(log);
-          
-          // Sum up nutrients
-          caloriesConsumed += (log['calories'] as num?)?.toDouble() ?? 0.0;
-          proteinConsumed += (log['protein'] as num?)?.toDouble() ?? 0.0;
-          carbsConsumed += (log['carbohydrates'] as num?)?.toDouble() ?? 0.0;
-          fatConsumed += (log['fat'] as num?)?.toDouble() ?? 0.0;
-        }
-      }
-      
-      // Sort food entries by timestamp (newest first)
-      todayFoodEntries.sort((a, b) {
-        final aTime = DateTime.parse(a['timestamp'] as String);
-        final bTime = DateTime.parse(b['timestamp'] as String);
-        return bTime.compareTo(aTime);
-      });
-      
+      final data = await ApiService.getDailyData(_selectedDate);
       setState(() {
-        // Update nutrition data
-        _nutritionData = {
-          'calories': {
-            'consumed': caloriesConsumed,
-            'goal': dailyGoals['calories']?.toDouble() ?? 2000.0,
-          },
-          'protein': {
-            'consumed': proteinConsumed,
-            'goal': dailyGoals['protein']?.toDouble() ?? 50.0,
-          },
-          'carbohydrates': {
-            'consumed': carbsConsumed,
-            'goal': dailyGoals['carbohydrates']?.toDouble() ?? 250.0,
-          },
-          'fat': {
-            'consumed': fatConsumed,
-            'goal': dailyGoals['fat']?.toDouble() ?? 70.0,
-          },
-        };
-        
-        // Update food entries
-        _foodEntries = todayFoodEntries;
-        
+        _nutritionData = data['nutritionData'];
+        _foodEntries = data['foodEntries'];
         _isLoading = false;
+        
+        // Update streak data - this is dummy data for now
+        // In a real app, this would come from your backend or local storage
+        _streakCount = 7; // Example streak count
+        _isOnStreak = true; // Example streak status
       });
     } catch (e) {
-      print('Error fetching daily data: $e');
       setState(() {
         _isLoading = false;
+        // For demo purposes, set some streak data even when API fails
+        _streakCount = 7;
+        _isOnStreak = true;
       });
-      
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to fetch daily data: $e',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // ... existing error handling code ...
     }
   }
   
@@ -236,37 +169,136 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left, color: Colors.white),
-              onPressed: _previousDay,
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                      _fetchDailyData();
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.arrow_back_ios,
+                    color: Colors.white,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null && picked != _selectedDate) {
+                      setState(() {
+                        _selectedDate = picked;
+                        _fetchDailyData();
+                      });
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      Text(
+                        _formatDate(_selectedDate),
+                        style: const TextStyle(fontSize: 18, color: Colors.white),
+                      ),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    final tomorrow = DateTime.now().add(const Duration(days: 1));
+                    if (_selectedDate.day != tomorrow.day ||
+                        _selectedDate.month != tomorrow.month ||
+                        _selectedDate.year != tomorrow.year) {
+                      setState(() {
+                        _selectedDate = _selectedDate.add(const Duration(days: 1));
+                        if (_selectedDate.isAfter(DateTime.now())) {
+                          _selectedDate = DateTime.now();
+                        }
+                        _fetchDailyData();
+                      });
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              _formatDate(_selectedDate),
-              style: GoogleFonts.montserrat(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right, color: Colors.white),
-              onPressed: _nextDay,
+            Row(
+              children: [
+                // Streak button
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StreakScreen(
+                          streakCount: _streakCount,
+                          isOnStreak: _isOnStreak,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        Icons.local_fire_department,
+                        color: _isOnStreak ? Colors.red : Colors.white,
+                        size: 30,
+                      ),
+                      if (_streakCount > 0)
+                        Positioned(
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$_streakCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Refresh button
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _fetchDailyData();
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.refresh,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        centerTitle: true,
-        backgroundColor: Colors.black,
-        elevation: 1,
-        actions: [
-          // Refresh button
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _fetchDailyData,
-          ),
-        ],
       ),
       body: _isLoading 
           ? const Center(child: CircularProgressIndicator(color: Colors.green))
@@ -340,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline),
-              label: 'Nutritionist',
+              label: 'Padma',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today),

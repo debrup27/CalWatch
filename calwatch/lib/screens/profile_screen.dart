@@ -252,7 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline),
-              label: 'Nutritionist',
+              label: 'Padma',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today),

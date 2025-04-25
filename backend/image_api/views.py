@@ -1,4 +1,4 @@
-from rest_framework import status, generics, permissions
+'''from rest_framework import status, generics, permissions
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import ImageUpload, PredictionFeedback
@@ -61,3 +61,4 @@ class UserImageListView(generics.ListAPIView):
     
     def get_queryset(self):
         return ImageUpload.objects.filter(user=self.request.user).order_by('-timestamp')
+        '''

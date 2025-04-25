@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // Base URL for API
-  static const String baseUrl = 'http://192.168.85.153:8000';
+  static const String baseUrl = 'http://192.168.29.249:8000';
   
   // Djoser Authentication Endpoints
   static const String registerEndpoint = '/auth/users/';
