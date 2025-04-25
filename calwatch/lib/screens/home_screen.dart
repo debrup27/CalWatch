@@ -88,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
     
     try {
-      final data = await ApiService.getDailyData(_selectedDate);
+      final data = await _apiService.getDailyData(_selectedDate);
       setState(() {
         _nutritionData = data['nutritionData'];
         _foodEntries = data['foodEntries'];

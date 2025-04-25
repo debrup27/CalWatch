@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class ApiService {
   // Base URL for API
@@ -920,6 +921,86 @@ class ApiService {
     } catch (e) {
       print('Error fetching food logs: $e');
       return [];
+    }
+  }
+
+  // Get combined daily data
+  Future<Map<String, dynamic>> getDailyData(DateTime date) async {
+    try {
+      // Get the date in YYYY-MM-DD format
+      final today = DateTime(date.year, date.month, date.day);
+      final tomorrow = today.add(const Duration(days: 1));
+      
+      // Fetch daily goals
+      final dailyGoals = await getDailyGoals();
+      
+      // Fetch today's food logs
+      final foodLogs = await getFoodLogs(today, tomorrow);
+      
+      // Calculate consumed nutrition values
+      double caloriesConsumed = 0.0;
+      double proteinConsumed = 0.0;
+      double carbsConsumed = 0.0;
+      double fatConsumed = 0.0;
+      
+      // Process food logs
+      final todayFoodEntries = <Map<String, dynamic>>[];
+      final timeFormat = DateFormat('h:mm a');
+      
+      for (final log in foodLogs) {
+        final timestamp = DateTime.parse(log['timestamp'] as String);
+        final logDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
+        
+        // Only include logs from today
+        if (logDate.isAtSameMomentAs(today)) {
+          // Add formatted time to the log
+          log['formatted_time'] = timeFormat.format(timestamp);
+          
+          // Add to food entries for display
+          todayFoodEntries.add(log);
+          
+          // Sum up nutrients
+          caloriesConsumed += (log['calories'] as num?)?.toDouble() ?? 0.0;
+          proteinConsumed += (log['protein'] as num?)?.toDouble() ?? 0.0;
+          carbsConsumed += (log['carbohydrates'] as num?)?.toDouble() ?? 0.0;
+          fatConsumed += (log['fat'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+      
+      // Sort food entries by timestamp (newest first)
+      todayFoodEntries.sort((a, b) {
+        final aTime = DateTime.parse(a['timestamp'] as String);
+        final bTime = DateTime.parse(b['timestamp'] as String);
+        return bTime.compareTo(aTime);
+      });
+      
+      // Prepare nutrition data
+      final nutritionData = {
+        'calories': {
+          'consumed': caloriesConsumed,
+          'goal': dailyGoals['calories']?.toDouble() ?? 2000.0,
+        },
+        'protein': {
+          'consumed': proteinConsumed,
+          'goal': dailyGoals['protein']?.toDouble() ?? 50.0,
+        },
+        'carbohydrates': {
+          'consumed': carbsConsumed,
+          'goal': dailyGoals['carbohydrates']?.toDouble() ?? 250.0,
+        },
+        'fat': {
+          'consumed': fatConsumed,
+          'goal': dailyGoals['fat']?.toDouble() ?? 70.0,
+        },
+      };
+      
+      return {
+        'nutritionData': nutritionData,
+        'foodEntries': todayFoodEntries,
+      };
+    } catch (e) {
+      print('Error in getDailyData: $e');
+      rethrow;
     }
   }
 } 
