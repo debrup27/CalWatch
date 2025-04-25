@@ -119,7 +119,7 @@ class AddFoodView(generics.CreateAPIView):
             if not food_details:
                 return Response({"detail": "Food not found"}, status=status.HTTP_404_NOT_FOUND)
             
-            # Create food consumption entry
+            # Create food consumption entry with default values from food database
             consumption_data = {
                 'food_index': food_index if food_index > 0 else 0,
                 'food_id': food_id if food_id else food_details.get('food_code', ''),
@@ -129,6 +129,16 @@ class AddFoodView(generics.CreateAPIView):
                 'carbohydrates': float(food_details.get('nutrients', {}).get('carbs', 0)),
                 'fat': float(food_details.get('nutrients', {}).get('fat', 0))
             }
+            
+            # Override with any explicitly provided nutritional values
+            if 'calories' in request.data:
+                consumption_data['calories'] = float(request.data.get('calories'))
+            if 'protein' in request.data:
+                consumption_data['protein'] = float(request.data.get('protein'))
+            if 'carbohydrates' in request.data:
+                consumption_data['carbohydrates'] = float(request.data.get('carbohydrates'))
+            if 'fat' in request.data:
+                consumption_data['fat'] = float(request.data.get('fat'))
             
             serializer = self.get_serializer(data=consumption_data)
             serializer.is_valid(raise_exception=True)

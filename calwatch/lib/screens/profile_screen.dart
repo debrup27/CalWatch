@@ -48,19 +48,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'fat': 0.0,
   };
   
-  // Sample micronutrients data for donut chart
-  final Map<String, double> _micronutrientsData = {
-    'Vitamin A': 85, // percentage of daily value
-    'Vitamin C': 120,
-    'Calcium': 65,
-    'Iron': 70,
-    'Potassium': 55,
+  // Micronutrients data for chart
+  Map<String, double> _micronutrientsData = {
+    'Vitamin A': 0.0,
+    'Vitamin C': 0.0,
+    'Calcium': 0.0,
+    'Iron': 0.0,
+    'Potassium': 0.0,
   };
+  
+  // Micronutrient loading state
+  bool _isLoadingMicronutrients = true;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
+    _fetchMicronutrientData();
+  }
+  
+  Future<void> _fetchMicronutrientData() async {
+    setState(() {
+      _isLoadingMicronutrients = true;
+    });
+    
+    try {
+      final apiService = ApiService();
+      final micronutrientData = await apiService.get7DayMicronutrientAverages();
+      
+      setState(() {
+        _micronutrientsData = micronutrientData;
+        _isLoadingMicronutrients = false;
+      });
+      
+      print('Micronutrient data loaded: $_micronutrientsData');
+    } catch (e) {
+      print('Error loading micronutrient data: $e');
+      setState(() {
+        // Set default values in case of error
+        _micronutrientsData = {
+          'Vitamin A': 0.0,
+          'Vitamin C': 0.0,
+          'Calcium': 0.0,
+          'Iron': 0.0,
+          'Potassium': 0.0,
+        };
+        _isLoadingMicronutrients = false;
+      });
+    }
   }
   
   Future<void> _fetchUserData() async {
@@ -123,6 +158,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+    
+    // Also refresh micronutrient data
+    _fetchMicronutrientData();
   }
 
   void _handleNavigation(int index) {
@@ -680,6 +718,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   
   Widget _buildMicronutrientsSection() {
+    // Define recommended daily values (RDV) for micronutrients and their units
+    final Map<String, Map<String, dynamic>> micronutrientInfo = {
+      'Vitamin A': {'rdv': 900.0, 'unit': 'μg'},
+      'Vitamin C': {'rdv': 90.0, 'unit': 'mg'},
+      'Calcium': {'rdv': 1000.0, 'unit': 'mg'},
+      'Iron': {'rdv': 8.0, 'unit': 'mg'},
+      'Potassium': {'rdv': 3500.0, 'unit': 'mg'}
+    };
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -709,48 +756,144 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           
-          // Micronutrients list with circular progress indicators
-          ..._micronutrientsData.entries.map((entry) {
-            final Color color = _getMicronutrientColor(entry.value);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
+          _isLoadingMicronutrients 
+          ? Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  const SizedBox(height: 20),
+                  const CircularProgressIndicator(color: Colors.green),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Loading micronutrient data...',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 14,
+                      color: Colors.grey[400],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            )
+          : _micronutrientsData.values.every((value) => value == 0.0)
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
                     children: [
+                      const Icon(
+                        Icons.restaurant_outlined,
+                        color: Colors.grey,
+                        size: 40,
+                      ),
+                      const SizedBox(height: 16),
                       Text(
-                        entry.key,
+                        'No micronutrient data available',
                         style: GoogleFonts.montserrat(
-                          fontSize: 14,
-                          color: Colors.white,
+                          fontSize: 16,
+                          color: Colors.grey[400],
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
+                      const SizedBox(height: 8),
                       Text(
-                        '${entry.value.toInt()}%',
+                        'Log your meals to start tracking micronutrients',
+                        textAlign: TextAlign.center,
                         style: GoogleFonts.montserrat(
                           fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: color,
+                          color: Colors.grey[600],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: entry.value / 100,
-                    backgroundColor: Colors.grey[800],
-                    color: color,
-                    minHeight: 6,
-                    borderRadius: BorderRadius.circular(3),
+                ),
+              )
+            : Column(
+                children: [
+                  // Show information about the data source
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Text(
+                      'Based on your actual food consumption for the past week',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
+                  
+                  // Micronutrients list with progress indicators
+                  ..._micronutrientsData.entries.map((entry) {
+                    final Color color = _getMicronutrientColor(entry.value);
+                    final rdv = micronutrientInfo[entry.key]!['rdv'] as double;
+                    final unit = micronutrientInfo[entry.key]!['unit'] as String;
+                    
+                    // Calculate the actual value based on percentage of RDV
+                    final double actualValue = (entry.value * rdv) / 100;
+                    
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                entry.key,
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                '${entry.value.toInt()}%',
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: color,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          LinearProgressIndicator(
+                            value: entry.value / 100,
+                            backgroundColor: Colors.grey[800],
+                            color: color,
+                            minHeight: 6,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          const SizedBox(height: 6),
+                          // Add the current/max value display below the progress bar
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${actualValue.toStringAsFixed(1)} $unit',
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 12,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                              Text(
+                                '${rdv.toStringAsFixed(1)} $unit',
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 12,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ],
               ),
-            );
-          }).toList(),
         ],
       ),
     );

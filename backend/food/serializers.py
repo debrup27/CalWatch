@@ -16,5 +16,7 @@ class WaterIntakeSerializer(serializers.ModelSerializer):
 class FoodConsumptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FoodConsumption
-        fields = ('id', 'food_index', 'food_name', 'calories', 'protein', 'carbohydrates', 'fat', 'timestamp')
+        # fields = "__all__"
+
+        fields = ('id', 'food_index', 'food_id', 'food_name', 'calories', 'protein', 'carbohydrates', 'fat', 'timestamp')
         read_only_fields = ('id', 'timestamp') 

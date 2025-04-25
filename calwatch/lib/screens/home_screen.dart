@@ -9,6 +9,9 @@ import 'nutritionist_screen.dart';
 import '../services/api_service.dart';
 import 'package:intl/intl.dart';
 import 'streak_screen.dart';
+import '../services/streak_service.dart';
+import '../services/groq_service.dart';
+import 'dart:async'; // Add StreamController import
 
 class HomeScreen extends StatefulWidget {
   final String? username;
@@ -61,24 +64,46 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // Date format
   final _timeFormat = DateFormat('h:mm a');
 
+  // Add streak service
+  late StreakService _streakService;
+
+  // Add GroqService
+  late GroqService _groqService;
+
+  // For motivational quote
+  String _motivationalQuote = "";
+  bool _isLoadingQuote = true;
+
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isPenaltyActive = false;
+  
+  // Add water controller
+  late StreamController<void> _fetchWaterController;
+
   @override
   void initState() {
     super.initState();
-    _apiService = ApiService();
+    _selectedDate = DateTime.now(); // Initialize _selectedDate
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(seconds: 1),
+      value: 1.0,
     );
+    _groqService = GroqService();
+    _streakService = StreakService();
+    _apiService = ApiService();
+    _fetchWaterController = StreamController<void>.broadcast();
     
-    // Initialize _selectedDate immediately to avoid LateInitializationError
-    _selectedDate = DateTime.now();
-    
-    // Fetch data after widget is built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Add listener for water refreshes
+    _fetchWaterController.stream.listen((_) {
       _fetchDailyData();
     });
     
-    _controller.forward();
+    // Schedule data fetch after build completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchDailyData();
+      _checkPenaltyStatus();
+    });
   }
   
   @override
@@ -90,42 +115,256 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _fetchDailyData() async {
     setState(() {
       _isLoading = true;
+      _isLoadingQuote = true;
     });
     
     try {
       final data = await _apiService.getDailyData(_selectedDate);
+      
+      // Check if it's today's data and update streak if needed
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final selectedDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+      
+      // Previous streak count to check for milestones
+      final previousStreakCount = _streakCount;
+      
+      // Only update streak for today's data
+      if (selectedDay.isAtSameMomentAs(today)) {
+        // Update streak based on nutrition data
+        final streakResult = await _streakService.updateStreak(data['nutritionData']);
+        
+        // Update streak info from result
+        _streakCount = streakResult['streakCount'];
+        _isOnStreak = streakResult['isOnStreak'];
+        
+        // Show streak notification if streak changed
+        if (streakResult['streakChanged'] && mounted) {
+          final goalsMet = streakResult['goalsMet'];
+          _showStreakNotification(goalsMet, _streakCount);
+          
+          // Check for streak milestones and show motivational quote
+          if (goalsMet && _streakCount > previousStreakCount) {
+            // Define milestone streak counts
+            final milestones = [3, 7, 14, 21, 30, 60, 90, 180, 365];
+            
+            // Check if the current streak count is a milestone
+            if (milestones.contains(_streakCount)) {
+              _showStreakMilestoneMotivation(_streakCount);
+            }
+          }
+        }
+      } else {
+        // For other days, just fetch the current streak info
+        _streakCount = await _streakService.getStreakCount();
+        _isOnStreak = await _streakService.isOnStreak();
+      }
+      
+      // After updating streak, reload the motivational quote if streak count changed
+      if (_streakCount != previousStreakCount) {
+        _loadMotivationalQuote();
+      }
+      
       setState(() {
         _nutritionData = data['nutritionData'];
         _foodEntries = data['foodEntries'];
         _waterIntake = data['waterIntake'] as double;
         _isLoading = false;
-        
-        // Update streak data - this is dummy data for now
-        // In a real app, this would come from your backend or local storage
-        _streakCount = 7; // Example streak count
-        _isOnStreak = true; // Example streak status
       });
     } catch (e) {
       print('Error fetching daily data: $e');
       setState(() {
         _isLoading = false;
-        // For demo purposes, set some streak data even when API fails
-        _streakCount = 7;
-        _isOnStreak = true;
+        
+        // Fallback streak data from service
+        _streakService.getStreakCount().then((count) => _streakCount = count);
+        _streakService.isOnStreak().then((status) => _isOnStreak = status); 
       });
       
-      // Show error message
+      // Show error message if mounted and context is available
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to fetch daily data: $e',
-              style: GoogleFonts.poppins(),
+        // Using Future.microtask to ensure we're not in build or layout phase
+        Future.microtask(() {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to fetch daily data: $e',
+                  style: GoogleFonts.poppins(),
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        });
+      }
+    }
+  }
+  
+  // Show streak notification
+  void _showStreakNotification(bool goalsMet, int streakCount) {
+    final String message = goalsMet 
+        ? streakCount > 1 
+            ? 'Streak extended to $streakCount days! 🔥'
+            : 'New streak started! 🔥'
+        : 'Streak reset. Try to meet your calorie goal tomorrow.';
+    
+    final Color backgroundColor = goalsMet ? Colors.green : Colors.orange;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+  
+  // Add a new method to show motivational quotes at streak milestones
+  Future<void> _showStreakMilestoneMotivation(int streakCount) async {
+    try {
+      // Get a motivational quote from GROQ
+      final quote = await _groqService.getStreakMotivationalQuote(streakCount);
+      
+      // Show a more prominent notification with the quote
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.amber.withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 5,
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.amber.withOpacity(0.5),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Flame icon
+                  const Icon(
+                    Icons.local_fire_department,
+                    color: Colors.amber,
+                    size: 50,
+                  ),
+                  const SizedBox(height: 15),
+                  // Milestone text
+                  Text(
+                    "$streakCount Day Streak Milestone!",
+                    style: GoogleFonts.montserrat(
+                      color: Colors.amber,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15),
+                  // Motivational quote
+                  Text(
+                    quote,
+                    style: GoogleFonts.montserrat(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontStyle: FontStyle.italic,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  // Padma attribution
+                  Text(
+                    "~ PADMA",
+                    style: GoogleFonts.montserrat(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                  const SizedBox(height: 20),
+                  // Close button
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      minimumSize: const Size(double.infinity, 45),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      "Keep Going!",
+                      style: GoogleFonts.montserrat(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            backgroundColor: Colors.red,
           ),
         );
       }
+    } catch (e) {
+      print('Error showing streak milestone motivation: $e');
+      // Continue silently if there's an error - this is a non-critical feature
+    }
+  }
+  
+  // Add method to load motivational quote
+  Future<void> _loadMotivationalQuote() async {
+    if (_streakCount == 0) {
+      setState(() {
+        _motivationalQuote = "Every nutritional journey begins with a single healthy choice. Start your streak today!";
+        _isLoadingQuote = false;
+      });
+      return;
+    }
+    
+    try {
+      final quote = await _groqService.getStreakMotivationalQuote(_streakCount);
+      setState(() {
+        _motivationalQuote = quote;
+        _isLoadingQuote = false;
+      });
+    } catch (e) {
+      print('Error loading motivational quote: $e');
+      // Fallback quotes based on streak length
+      final fallbackQuotes = [
+        "Consistency is the key to lasting change. Keep going!",
+        "Every day you maintain your streak is a victory for your health.",
+        "Small daily improvements lead to remarkable results over time.",
+        "Your dedication to nutrition is building a healthier future.",
+        "The strength of your streak reflects the strength of your commitment."
+      ];
+      
+      // Pick a random fallback quote
+      final randomIndex = DateTime.now().millisecondsSinceEpoch % fallbackQuotes.length;
+      setState(() {
+        _motivationalQuote = fallbackQuotes[randomIndex];
+        _isLoadingQuote = false;
+      });
     }
   }
   
@@ -185,6 +424,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    // Get streak color based on streak count
+    Color streakColor = Colors.redAccent;
+    if (_streakCount >= 30) streakColor = Colors.purpleAccent;
+    else if (_streakCount >= 14) streakColor = Colors.orangeAccent;
+    else if (_streakCount >= 7) streakColor = Colors.amberAccent;
+    
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -259,48 +504,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Row(
               children: [
                 // Streak button
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => StreakScreen(
-                          streakCount: _streakCount,
-                          isOnStreak: _isOnStreak,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(
-                        Icons.local_fire_department,
-                        color: _isOnStreak ? Colors.red : Colors.white,
-                        size: 30,
-                      ),
-                      if (_streakCount > 0)
-                        Positioned(
-                          bottom: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: Colors.black45,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '$_streakCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                _buildStreakWidget(),
                 const SizedBox(width: 8),
                 // Refresh button
                 IconButton(
@@ -330,9 +534,96 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     // Nutrient circles
                     _buildNutrientCircles(),
                     
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     
-                    // Water consumption using our new widget
+                    // Motivational Quote from PADMA
+                    if (_isOnStreak && _streakCount > 0)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[900],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: streakColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: streakColor.withOpacity(0.1),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline,
+                                      color: streakColor,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      "PADMA says:",
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: streakColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.local_fire_department,
+                                      color: streakColor,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "$_streakCount day streak",
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _isLoadingQuote
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    _motivationalQuote,
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.montserrat(
+                                      fontSize: 15,
+                                      fontStyle: FontStyle.italic,
+                                      color: Colors.white,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                          ],
+                        ),
+                      ),
+                    
+                    // Water consumption
                     WaterTrackerWidget(
                       date: _selectedDate,
                       waterAmount: _waterIntake,
@@ -746,5 +1037,79 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ],
       ),
     );
+  }
+
+  Widget _buildStreakWidget() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StreakScreen(
+              streakCount: _streakCount,
+              isOnStreak: _streakCount > 0,
+            ),
+          ),
+        );
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(
+            Icons.local_fire_department,
+            color: _getStreakColor(),
+            size: 32,
+          ),
+          Positioned(
+            bottom: 2,
+            child: Text(
+              '$_streakCount',
+              style: GoogleFonts.montserrat(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          // Show penalty dot if there's a penalty active
+          if (_isPenaltyActive)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Check if there's an active penalty
+  Future<void> _checkPenaltyStatus() async {
+    try {
+      // Get the penalty status from the streak service
+      final penaltyStatus = await _streakService.getPenaltyStatus();
+      setState(() {
+        _isPenaltyActive = penaltyStatus['isPenaltyActive'];
+      });
+    } catch (e) {
+      print('Error checking penalty status: $e');
+      setState(() {
+        _isPenaltyActive = false;
+      });
+    }
+  }
+
+  Color _getStreakColor() {
+    if (_streakCount >= 30) return Colors.purpleAccent;
+    else if (_streakCount >= 14) return Colors.orangeAccent;
+    else if (_streakCount >= 7) return Colors.amberAccent;
+    else return Colors.redAccent;
   }
 }

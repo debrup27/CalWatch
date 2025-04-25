@@ -234,6 +234,23 @@ Please include:
     
     return Scaffold(
       backgroundColor: Colors.black,
+      // Add AppBar with back button when not a new user (editing mode)
+      appBar: !widget.isNewUser ? AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Edit Profile Details',
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ) : null,
       body: Stack(
         children: [
           // Background stars

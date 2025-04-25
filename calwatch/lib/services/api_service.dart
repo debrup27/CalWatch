@@ -770,9 +770,63 @@ class ApiService {
       rethrow;
     }
   }
-  
+
+  // Get food details with index as primary option, falling back to id
+  Future<Map<String, dynamic>> getFoodDetailsWithIndexFallback(dynamic foodItem) async {
+    try {
+      // First try to use food_index if available
+      if (foodItem['food_index'] != null) {
+        print('Getting food details using index: ${foodItem['food_index']}');
+        final response = await http.get(
+          Uri.parse('$baseUrl$getFoodEndpoint?index=${foodItem['food_index']}'),
+          headers: await _buildHeaders(),
+        );
+        
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return _handleResponse(response);
+        }
+      }
+      
+      // Fall back to food_id if index failed or isn't available
+      if (foodItem['food_id'] != null) {
+        print('Getting food details using id: ${foodItem['food_id']}');
+        final response = await http.get(
+          Uri.parse('$baseUrl$getFoodEndpoint?id=${foodItem['food_id']}'),
+          headers: await _buildHeaders(),
+        );
+        
+        if (response.statusCode == 401) {
+          // Token expired, try to refresh
+          final refreshed = await refreshAccessToken();
+          if (refreshed) {
+            // Retry with new token
+            final retryResponse = await http.get(
+              Uri.parse('$baseUrl$getFoodEndpoint?id=${foodItem['food_id']}'),
+              headers: await _buildHeaders(),
+            );
+            return _handleResponse(retryResponse);
+          }
+        }
+        
+        return _handleResponse(response);
+      }
+      
+      throw Exception('Neither food_index nor food_id available for food item');
+    } catch (e) {
+      print('Error fetching food details: $e');
+      return {}; // Return empty map to avoid crashes
+    }
+  }
+
   // Add food consumption entry
-  Future<Map<String, dynamic>> addFoodConsumption({String? foodId, int? foodIndex}) async {
+  Future<Map<String, dynamic>> addFoodConsumption({
+    String? foodId, 
+    int? foodIndex,
+    double? calories,
+    double? protein,
+    double? carbohydrates,
+    double? fat
+  }) async {
     try {
       // Prepare request body based on what's available
       final Map<String, dynamic> requestBody = {};
@@ -784,6 +838,12 @@ class ApiService {
       } else {
         throw Exception('Either food_id or food_index must be provided');
       }
+      
+      // Add optional nutrition parameters if provided
+      if (calories != null) requestBody['calories'] = calories;
+      if (protein != null) requestBody['protein'] = protein;
+      if (carbohydrates != null) requestBody['carbohydrates'] = carbohydrates;
+      if (fat != null) requestBody['fat'] = fat;
       
       print('Adding food with request body: $requestBody');
       
@@ -960,6 +1020,79 @@ class ApiService {
     }
   }
 
+  // Get list of common food items
+  Future<List<Map<String, dynamic>>> getFoodList({int limit = 20}) async {
+    try {
+      // Get list of predefined common foods - using a fixed date range for recent items
+      // Using a wide date range to ensure we get enough results
+      final today = DateTime.now().add(const Duration(days: 1)); // Include today
+      final oneYearAgo = today.subtract(const Duration(days: 30));
+      
+      // Format dates to YYYY-MM-DD
+      final startDateStr = '${oneYearAgo.year}-${oneYearAgo.month.toString().padLeft(2, '0')}-${oneYearAgo.day.toString().padLeft(2, '0')}';
+      final endDateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      
+      print('Fetching common foods from $startDateStr to $endDateStr');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl$listFoodEndpoint?start_date=$startDateStr&end_date=$endDateStr'),
+        headers: await _buildHeaders(),
+      );
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.get(
+            Uri.parse('$baseUrl$listFoodEndpoint?start_date=$startDateStr&end_date=$endDateStr'),
+            headers: await _buildHeaders(),
+          );
+          final data = _handleResponse(retryResponse);
+          if (data is List) {
+            // Limit and filter the results to get unique foods
+            final foods = List<Map<String, dynamic>>.from(data);
+            return _getUniqueFoods(foods, limit);
+          }
+          return [];
+        }
+      }
+      
+      final data = _handleResponse(response);
+      if (data is List) {
+        // Limit and filter the results to get unique foods
+        final foods = List<Map<String, dynamic>>.from(data);
+        return _getUniqueFoods(foods, limit);
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching food list: $e');
+      return [];
+    }
+  }
+
+  // Helper method to get unique foods by name and limit results
+  List<Map<String, dynamic>> _getUniqueFoods(List<Map<String, dynamic>> foods, int limit) {
+    // Use a set to track seen food names
+    final Set<String> seenFoodNames = {};
+    final List<Map<String, dynamic>> uniqueFoods = [];
+    
+    for (final food in foods) {
+      final name = food['food_name'] ?? '';
+      if (name.isNotEmpty && !seenFoodNames.contains(name)) {
+        seenFoodNames.add(name);
+        uniqueFoods.add(food);
+        
+        // Stop when we have enough unique foods
+        if (uniqueFoods.length >= limit) {
+          break;
+        }
+      }
+    }
+    
+    return uniqueFoods;
+  }
+
   // Get all daily data for a specific date
   Future<Map<String, dynamic>> getDailyData(DateTime date) async {
     // Get date for the next day since end date is exclusive
@@ -1046,5 +1179,121 @@ class ApiService {
         'waterIntake': 0.0,
       };
     }
+  }
+
+  // Calculate 7-day average micronutrient consumption
+  Future<Map<String, double>> get7DayMicronutrientAverages() async {
+    try {
+      // Define recommended daily values (RDV) for micronutrients
+      final Map<String, double> recommendedDailyValues = {
+        'Vitamin A': 900.0, // in mcg (ug)
+        'Vitamin C': 90.0,  // in mg
+        'Calcium': 1000.0,  // in mg
+        'Iron': 8.0,        // in mg
+        'Potassium': 3500.0 // in mg
+      };
+      
+      // Initialize totals map
+      final Map<String, double> totalMicronutrients = {
+        'Vitamin A': 0.0,
+        'Vitamin C': 0.0,
+        'Calcium': 0.0,
+        'Iron': 0.0,
+        'Potassium': 0.0
+      };
+      
+      // Get today's date and date 7 days ago
+      final today = DateTime.now();
+      final sevenDaysAgo = today.subtract(const Duration(days: 7));
+      
+      // Get food logs for the last 7 days
+      final foodLogs = await getFoodLogs(sevenDaysAgo, today.add(const Duration(days: 1)));
+      
+      if (foodLogs.isEmpty) {
+        print('No food logs found for the last 7 days');
+        return {
+          'Vitamin A': 0.0,
+          'Vitamin C': 0.0,
+          'Calcium': 0.0,
+          'Iron': 0.0,
+          'Potassium': 0.0
+        };
+      }
+      
+      print('Found ${foodLogs.length} food logs for the last 7 days');
+      
+      // Process each food log to get its detailed nutritional information
+      for (final foodLog in foodLogs) {
+        try {
+          // Get detailed food info using the index first, then id as fallback
+          final foodDetails = await getFoodDetailsWithIndexFallback(foodLog);
+          
+          if (foodDetails.isEmpty) {
+            print('No details found for food: ${foodLog['food_name']}');
+            continue;
+          }
+          
+          // Parse the micronutrient values
+          // The keys we're looking for in the API response
+          final double vitaminA = _parseNutrientValue(foodDetails['vita_ug']);
+          final double vitaminC = _parseNutrientValue(foodDetails['vitc_mg']);
+          final double calcium = _parseNutrientValue(foodDetails['calcium_mg']);
+          final double iron = _parseNutrientValue(foodDetails['iron_mg']);
+          final double potassium = _parseNutrientValue(foodDetails['potassium_mg']);
+          
+          // Add to totals
+          totalMicronutrients['Vitamin A'] = totalMicronutrients['Vitamin A']! + vitaminA;
+          totalMicronutrients['Vitamin C'] = totalMicronutrients['Vitamin C']! + vitaminC;
+          totalMicronutrients['Calcium'] = totalMicronutrients['Calcium']! + calcium;
+          totalMicronutrients['Iron'] = totalMicronutrients['Iron']! + iron;
+          totalMicronutrients['Potassium'] = totalMicronutrients['Potassium']! + potassium;
+          
+        } catch (e) {
+          print('Error processing food log: $e');
+          continue; // Skip this food item and continue with the next
+        }
+      }
+      
+      // Calculate daily averages
+      final Map<String, double> averagePercentages = {};
+      
+      for (final nutrient in totalMicronutrients.keys) {
+        // Calculate the daily average amount
+        final double dailyAverage = totalMicronutrients[nutrient]! / 7.0;
+        
+        // Calculate the percentage of the RDV
+        final double percentage = (dailyAverage / recommendedDailyValues[nutrient]!) * 100;
+        
+        // Cap at 200% for visual purposes
+        averagePercentages[nutrient] = percentage > 200 ? 200 : percentage;
+      }
+      
+      return averagePercentages;
+    } catch (e) {
+      print('Error calculating micronutrient averages: $e');
+      // Return default values in case of error
+      return {
+        'Vitamin A': 0.0,
+        'Vitamin C': 0.0,
+        'Calcium': 0.0,
+        'Iron': 0.0,
+        'Potassium': 0.0
+      };
+    }
+  }
+  
+  // Helper method to parse nutrient values that could be strings, nulls, etc.
+  double _parseNutrientValue(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      try {
+        return double.parse(value);
+      } catch (e) {
+        print('Error parsing nutrient value "$value": $e');
+        return 0.0;
+      }
+    }
+    return 0.0;
   }
 } 

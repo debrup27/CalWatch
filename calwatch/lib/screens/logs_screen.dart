@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'home_screen.dart';
 import 'nutritionist_screen.dart';
 import 'profile_screen.dart';
@@ -27,12 +28,16 @@ class _LogsScreenState extends State<LogsScreen> {
   
   // Combined map for both food and water logs
   Map<DateTime, List<Map<String, dynamic>>> _combinedLogs = {};
+
+  // Map to store daily calorie data for the chart
+  Map<DateTime, double> _calorieData = {};
   
   // ApiService instance
   late ApiService _apiService;
   
   // Format dates
   final _dateFormat = DateFormat('h:mm a');
+  final _chartDateFormat = DateFormat('MM/dd');
 
   void _handleNavigation(int index) {
     if (index == _selectedIndex) return;
@@ -116,8 +121,9 @@ class _LogsScreenState extends State<LogsScreen> {
       // Fetch water logs (optional - if you want to include this as well)
       final waterLogs = await _apiService.getWaterIntake();
       
-      // Reset the combined logs map
+      // Reset the combined logs map and calorie data
       final newCombinedLogs = <DateTime, List<Map<String, dynamic>>>{};
+      final newCalorieData = <DateTime, double>{};
       
       // Process food logs
       for (final log in foodLogs) {
@@ -133,6 +139,15 @@ class _LogsScreenState extends State<LogsScreen> {
         log['type'] = 'food';
         
         newCombinedLogs[day]!.add(log);
+        
+        // Add calories to the calorie data map
+        final calories = log['calories'] != null ? 
+          (log['calories'] is double ? log['calories'] : double.parse(log['calories'].toString())) : 0.0;
+          
+        if (!newCalorieData.containsKey(day)) {
+          newCalorieData[day] = 0.0;
+        }
+        newCalorieData[day] = (newCalorieData[day] ?? 0.0) + calories;
       }
       
       // Process water logs - only those in our date range
@@ -165,6 +180,7 @@ class _LogsScreenState extends State<LogsScreen> {
       
       setState(() {
         _combinedLogs = newCombinedLogs;
+        _calorieData = newCalorieData;
         _isLoading = false;
       });
     } catch (e) {
@@ -232,7 +248,8 @@ class _LogsScreenState extends State<LogsScreen> {
       body: Column(
         children: [
           _buildCalendar(),
-          const SizedBox(height: 20),
+          if (!_isLoading) _buildCalorieChart(),
+          const SizedBox(height: 10),
           _isLoading 
               ? const Expanded(
                   child: Center(
@@ -316,7 +333,6 @@ class _LogsScreenState extends State<LogsScreen> {
               lastDay: DateTime.utc(2030, 12, 31),
               focusedDay: _focusedDay,
               calendarFormat: _calendarFormat,
-              eventLoader: _getEventsForDay,
               selectedDayPredicate: (day) {
                 return isSameDay(_selectedDay, day);
               },
@@ -355,10 +371,6 @@ class _LogsScreenState extends State<LogsScreen> {
                   color: Colors.green,
                   shape: BoxShape.circle,
                 ),
-                markerDecoration: const BoxDecoration(
-                  color: Colors.orangeAccent,
-                  shape: BoxShape.circle,
-                ),
                 weekendTextStyle: const TextStyle(color: Colors.red),
                 outsideTextStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
                 defaultTextStyle: const TextStyle(color: Colors.white),
@@ -384,6 +396,197 @@ class _LogsScreenState extends State<LogsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCalorieChart() {
+    // Get the current date range based on calendar format
+    final dateRange = _getDateRange();
+    final startDate = dateRange['start']!;
+    final endDate = dateRange['end']!;
+    
+    // Get all dates in the range
+    final dates = <DateTime>[];
+    for (var date = startDate; date.isBefore(endDate.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
+      dates.add(DateTime(date.year, date.month, date.day));
+    }
+    
+    // Get calorie data for all dates in the range
+    final spots = <FlSpot>[];
+    final bottomTitles = <String>[];
+    for (int i = 0; i < dates.length; i++) {
+      final date = dates[i];
+      final calories = _calorieData[date] ?? 0.0;
+      spots.add(FlSpot(i.toDouble(), calories));
+      bottomTitles.add(_chartDateFormat.format(date));
+    }
+    
+    // If no data or only one day, show empty chart with message
+    if (spots.isEmpty || spots.length == 1) {
+      return Container(
+        height: 180,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Center(
+          child: Text(
+            'Insufficient data to display calorie chart',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return Container(
+      height: 180,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Calorie Intake',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: true,
+                  horizontalInterval: 500,
+                  verticalInterval: 1,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey[800],
+                      strokeWidth: 1,
+                    );
+                  },
+                  getDrawingVerticalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey[800],
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        // Only show a subset of dates to avoid overcrowding
+                        final index = value.toInt();
+                        if (spots.length <= 7 || index % (spots.length ~/ 5) == 0 || index == spots.length - 1) {
+                          return Text(
+                            index < bottomTitles.length ? bottomTitles[index] : '',
+                            style: GoogleFonts.poppins(
+                              color: Colors.grey[400],
+                              fontSize: 10,
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: 500,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey[400],
+                            fontSize: 10,
+                          ),
+                        );
+                      },
+                      reservedSize: 40,
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(
+                  show: false,
+                ),
+                minX: 0,
+                maxX: spots.length.toDouble() - 1,
+                minY: 0,
+                maxY: (spots.map((e) => e.y).reduce((a, b) => a > b ? a : b) * 1.2)
+                    .clamp(500.0, 5000.0),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: false,
+                    gradient: const LinearGradient(
+                      colors: [
+                        Colors.orange,
+                        Colors.orangeAccent,
+                      ],
+                    ),
+                    barWidth: 2,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        return FlDotCirclePainter(
+                          radius: 3,
+                          color: Colors.orange,
+                          strokeWidth: 1,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.orange.withOpacity(0.3),
+                          Colors.orange.withOpacity(0.0),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

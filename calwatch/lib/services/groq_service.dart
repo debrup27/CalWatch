@@ -114,4 +114,86 @@ class GroqService {
       throw Exception('Error communicating with Groq API: ${e.toString()}');
     }
   }
+  
+  // Add a new method to get streak-based motivational quotes
+  Future<String> getStreakMotivationalQuote(int streakCount) async {
+    final apiKey = await getApiKey();
+    
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('Groq API key is not set');
+    }
+    
+    // Prepare messages for Groq API
+    final List<Map<String, String>> messages = [];
+    
+    // Define streak milestone categories
+    String streakCategory;
+    if (streakCount == 0) {
+      streakCategory = "just starting out";
+    } else if (streakCount == 1) {
+      streakCategory = "first day";
+    } else if (streakCount <= 3) {
+      streakCategory = "early days (2-3 days)";
+    } else if (streakCount <= 7) {
+      streakCategory = "building momentum (4-7 days)";
+    } else if (streakCount <= 14) {
+      streakCategory = "establishing habits (1-2 weeks)";
+    } else if (streakCount <= 30) {
+      streakCategory = "strong commitment (2-4 weeks)";
+    } else if (streakCount <= 60) {
+      streakCategory = "impressive dedication (1-2 months)";
+    } else if (streakCount <= 90) {
+      streakCategory = "major achievement (2-3 months)";
+    } else {
+      streakCategory = "exceptional consistency (3+ months)";
+    }
+    
+    // System message to define the AI's role
+    messages.add({
+      'role': 'system',
+      'content': 'You are Padma, a supportive nutrition coach who provides motivational quotes related to health, nutrition, and consistency. '
+          'Keep responses short (1-2 sentences), inspiring, and personalized to the user\'s current streak milestone. '
+          'No greetings or explanations - just deliver the motivational quote.'
+    });
+    
+    // Add current user message
+    messages.add({
+      'role': 'user',
+      'content': 'I have a $streakCount day streak of meeting my nutrition goals. I\'m $streakCategory. Give me a motivational quote that\'s specific to my current streak milestone and will inspire me to maintain my streak.',
+    });
+    
+    // Prepare request body
+    final body = jsonEncode({
+      'model': 'llama3-8b-8192', // Using Llama 3 for quick and efficient responses
+      'messages': messages,
+      'temperature': 0.7,
+      'max_tokens': 100, // Short quotes only
+    });
+    
+    try {
+      final response = await http.post(
+        Uri.parse(baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: body,
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'];
+        return content.trim();
+      } else {
+        final errorBody = response.body.isNotEmpty ? jsonDecode(response.body) : {'error': 'Unknown error'};
+        final errorMessage = errorBody['error']?['message'] ?? 'Unknown error: ${response.statusCode}';
+        throw Exception('Failed to get motivational quote from Groq API: $errorMessage');
+      }
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Error communicating with Groq API: ${e.toString()}');
+    }
+  }
 } 

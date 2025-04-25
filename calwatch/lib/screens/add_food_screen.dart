@@ -43,6 +43,12 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     'Water'
   ];
   
+  // Editable nutrition values
+  double? _editedCalories;
+  double? _editedProtein;
+  double? _editedCarbs;
+  double? _editedFat;
+  
   @override
   void initState() {
     super.initState();
@@ -62,16 +68,37 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   
   // Load recent foods
   Future<void> _loadRecentFoods() async {
-    // In a real implementation, this would fetch from the API
     setState(() {
-      _recentFoods = [
-        {'name': 'Apple', 'meal': 'Snack', 'icon': Icons.apple, 'id': 'sample1'},
-        {'name': 'Coffee', 'meal': 'Breakfast', 'icon': Icons.coffee, 'id': 'sample2'},
-        {'name': 'Chicken Salad', 'meal': 'Lunch', 'icon': Icons.lunch_dining, 'id': 'sample3'},
-        {'name': 'Water', 'meal': 'Water', 'icon': Icons.water_drop, 'id': 'sample4'},
-        {'name': 'Pasta', 'meal': 'Dinner', 'icon': Icons.dinner_dining, 'id': 'sample5'},
-      ];
+      _isLoading = true;
     });
+    
+    try {
+      final apiService = ApiService();
+      final foods = await apiService.getFoodList(limit: 10);
+      
+      setState(() {
+        _recentFoods = foods;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading recent foods: $e');
+      setState(() {
+        _recentFoods = [];
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error loading recent foods: $e',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Debounced search implementation
@@ -136,7 +163,16 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     try {
       final apiService = ApiService();
       // Get the nutritional information
-      final foodDetails = await apiService.getFoodDetails(foodId);
+      Map<String, dynamic> foodDetails;
+      
+      if (foodIndex != null) {
+        print('Getting food details with index: $foodIndex');
+        final dummyFood = {'food_index': foodIndex};
+        foodDetails = await apiService.getFoodDetailsWithIndexFallback(dummyFood);
+      } else {
+        print('Getting food details with ID: $foodId');
+        foodDetails = await apiService.getFoodDetails(foodId);
+      }
       
       setState(() {
         // Only store the nutritional data and name, not the ID
@@ -242,10 +278,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     try {
       final apiService = ApiService();
       
-      // Use either ID or index to add the food
+      // Use either ID or index to add the food, including any edited values
       final result = await apiService.addFoodConsumption(
         foodId: _selectedFoodId,
         foodIndex: _selectedFoodIndex,
+        calories: _editedCalories,
+        protein: _editedProtein,
+        carbohydrates: _editedCarbs,
+        fat: _editedFat,
       );
       
       setState(() {
@@ -254,6 +294,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         _selectedFoodId = null;
         _selectedFoodIndex = null;
         _searchController.text = '';
+        // Reset edited values
+        _editedCalories = null;
+        _editedProtein = null;
+        _editedCarbs = null;
+        _editedFat = null;
       });
       
       if (mounted) {
@@ -289,6 +334,105 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         );
       }
     }
+  }
+
+  // Add a method to show the nutrition value editor
+  void _showNutritionEditor(String nutrient, double currentValue, Function(double) onSaved) {
+    final controller = TextEditingController(text: currentValue.toString());
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: Text(
+          'Edit $nutrient',
+          style: GoogleFonts.poppins(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Enter custom value:',
+              style: GoogleFonts.poppins(color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: GoogleFonts.poppins(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Value',
+                hintStyle: GoogleFonts.poppins(color: Colors.grey[600]),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey[700]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.green),
+                ),
+                filled: true,
+                fillColor: Colors.grey[800]!.withOpacity(0.5),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: Colors.grey[400]),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              // Try to parse the value
+              try {
+                final value = double.parse(controller.text);
+                onSaved(value);
+                Navigator.of(context).pop();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Please enter a valid number',
+                      style: GoogleFonts.poppins(),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Text(
+              'Save',
+              style: GoogleFonts.poppins(color: Colors.green),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add a debug method to show which nutrient is being edited
+  void _onEditNutrient(String nutrient, double currentValue, Function(double) onSaved) {
+    print('Edit button tapped for $nutrient with value $currentValue');
+    _showNutritionEditor(nutrient, currentValue, onSaved);
+  }
+
+  // Add a method to safely parse numeric values
+  double _parseNutrientValue(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      try {
+        return double.parse(value);
+      } catch (e) {
+        print('Error parsing nutrient value: $e');
+        return 0.0;
+      }
+    }
+    return 0.0;
   }
 
   @override
@@ -521,6 +665,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     setState(() {
                       _selectedFood = null;
                       _searchController.text = '';
+                      // Reset edited values
+                      _editedCalories = null;
+                      _editedProtein = null;
+                      _editedCarbs = null;
+                      _editedFat = null;
                     });
                   },
                 ),
@@ -542,13 +691,72 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             
             // Nutrition info
             if (nutrients != null) ...[
-              _buildNutrientRow('Calories', '${nutrients['calories'] ?? 0} kcal', Colors.orange),
+              _buildNutrientRow(
+                'Calories', 
+                _editedCalories != null 
+                  ? '${_editedCalories!} kcal (edited)'
+                  : '${_parseNutrientValue(nutrients['calories'])} kcal', 
+                Colors.orange,
+                () => _onEditNutrient(
+                  'Calories',
+                  _editedCalories ?? _parseNutrientValue(nutrients['calories']),
+                  (value) => setState(() => _editedCalories = value)
+                ),
+                isEdited: _editedCalories != null
+              ),
               const SizedBox(height: 10),
-              _buildNutrientRow('Protein', '${nutrients['protein'] ?? 0} g', Colors.red),
+              _buildNutrientRow(
+                'Protein', 
+                _editedProtein != null 
+                  ? '${_editedProtein!} g (edited)' 
+                  : '${_parseNutrientValue(nutrients['protein'])} g', 
+                Colors.red,
+                () => _onEditNutrient(
+                  'Protein',
+                  _editedProtein ?? _parseNutrientValue(nutrients['protein']),
+                  (value) => setState(() => _editedProtein = value)
+                ),
+                isEdited: _editedProtein != null
+              ),
               const SizedBox(height: 10),
-              _buildNutrientRow('Carbs', '${nutrients['carbs'] ?? 0} g', Colors.blue),
+              _buildNutrientRow(
+                'Carbs', 
+                _editedCarbs != null 
+                  ? '${_editedCarbs!} g (edited)' 
+                  : '${_parseNutrientValue(nutrients['carbs'])} g', 
+                Colors.blue,
+                () => _onEditNutrient(
+                  'Carbs',
+                  _editedCarbs ?? _parseNutrientValue(nutrients['carbs']),
+                  (value) => setState(() => _editedCarbs = value)
+                ),
+                isEdited: _editedCarbs != null
+              ),
               const SizedBox(height: 10),
-              _buildNutrientRow('Fat', '${nutrients['fat'] ?? 0} g', Colors.yellow),
+              _buildNutrientRow(
+                'Fat', 
+                _editedFat != null 
+                  ? '${_editedFat!} g (edited)' 
+                  : '${_parseNutrientValue(nutrients['fat'])} g', 
+                Colors.yellow,
+                () => _onEditNutrient(
+                  'Fat',
+                  _editedFat ?? _parseNutrientValue(nutrients['fat']),
+                  (value) => setState(() => _editedFat = value)
+                ),
+                isEdited: _editedFat != null
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: Text(
+                  'Tap the edit buttons to customize nutrition values',
+                  style: GoogleFonts.poppins(
+                    color: Colors.grey[500],
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
             ],
           ],
         ),
@@ -556,7 +764,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     );
   }
   
-  Widget _buildNutrientRow(String label, String value, Color color) {
+  Widget _buildNutrientRow(String label, String value, Color color, VoidCallback onTap, {bool isEdited = false}) {
     return Row(
       children: [
         Container(
@@ -579,9 +787,30 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         Text(
           value,
           style: GoogleFonts.poppins(
-            color: Colors.white,
+            color: isEdited ? Colors.green : Colors.white,
             fontSize: 16,
             fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Separate edit button with Material for proper touch feedback
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(
+                Icons.edit,
+                color: isEdited ? Colors.green : Colors.grey[400],
+                size: 20,
+              ),
+            ),
           ),
         ),
       ],
@@ -636,57 +865,101 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Recent Foods',
+          'Common Foods Examples',
           style: GoogleFonts.poppins(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Type these in the search box above',
+          style: GoogleFonts.poppins(
+            color: Colors.grey[400],
+            fontSize: 12,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
         const SizedBox(height: 16),
-        ListView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          itemCount: _recentFoods.length,
-          itemBuilder: (context, index) {
-            final food = _recentFoods[index];
-            return Card(
-              color: Colors.grey[850],
-              elevation: 2,
-              margin: const EdgeInsets.only(bottom: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                title: Text(
-                  food['name'] as String,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                subtitle: Text(
-                  food['meal'] as String,
+        _recentFoods.isEmpty
+            ? Center(
+                child: Text(
+                  'No common foods available',
                   style: GoogleFonts.poppins(
                     color: Colors.grey[400],
+                    fontSize: 14,
                   ),
                 ),
-                leading: CircleAvatar(
-                  backgroundColor: food['meal'] == 'Water' ? Colors.blue : Colors.orange,
-                  child: Icon(
-                    food['icon'] as IconData,
-                    color: Colors.white,
-                  ),
+              )
+            : Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(15),
                 ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.add_circle, color: Colors.green),
-                  onPressed: () {
-                    // Select food and get details
-                    _selectFood(food);
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(10),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 2.5,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: _recentFoods.length,
+                  itemBuilder: (context, index) {
+                    final food = _recentFoods[index];
+                    String foodName = food['food_name'] ?? food['name'] ?? 'Unknown Food';
+                    
+                    // Determine icon color based on food name
+                    Color chipColor;
+                    if (foodName.toLowerCase().contains('water')) {
+                      chipColor = Colors.blue.withOpacity(0.7);
+                    } else if (foodName.toLowerCase().contains('fruit') || 
+                              foodName.toLowerCase().contains('apple')) {
+                      chipColor = Colors.red.withOpacity(0.7);
+                    } else if (foodName.toLowerCase().contains('coffee') ||
+                              foodName.toLowerCase().contains('tea')) {
+                      chipColor = Colors.brown.withOpacity(0.7);
+                    } else if (foodName.toLowerCase().contains('chicken') ||
+                              foodName.toLowerCase().contains('meat')) {
+                      chipColor = Colors.orange.withOpacity(0.7);
+                    } else if (foodName.toLowerCase().contains('veggie') ||
+                              foodName.toLowerCase().contains('salad')) {
+                      chipColor = Colors.green.withOpacity(0.7);
+                    } else {
+                      chipColor = Colors.purple.withOpacity(0.7);
+                    }
+                    
+                    // Trim the name if it's too long
+                    if (foodName.length > 15) {
+                      foodName = foodName.substring(0, 13) + '...';
+                    }
+                    
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: chipColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          foodName,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    );
                   },
                 ),
               ),
-            );
-          },
-        ),
       ],
     );
   }
