@@ -4,8 +4,15 @@ import '../services/api_service.dart';
 
 class WaterTrackerWidget extends StatefulWidget {
   final Function? onAddWater;
+  final DateTime date;
+  final double? waterAmount; // Optional - if provided, will use this instead of fetching
   
-  const WaterTrackerWidget({Key? key, this.onAddWater}) : super(key: key);
+  const WaterTrackerWidget({
+    Key? key, 
+    this.onAddWater, 
+    required this.date,
+    this.waterAmount,
+  }) : super(key: key);
 
   @override
   _WaterTrackerWidgetState createState() => _WaterTrackerWidgetState();
@@ -18,16 +25,42 @@ class _WaterTrackerWidgetState extends State<WaterTrackerWidget> with SingleTick
   final double _dailyTarget = 3000.0; // Daily target in ml
   bool _isLoading = true;
   bool _isAdding = false;
+  late ApiService _apiService;
 
   @override
   void initState() {
     super.initState();
+    _apiService = ApiService();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
     
-    _fetchWaterIntake();
+    if (widget.waterAmount != null) {
+      // Use the provided water amount
+      _totalWaterAmount = widget.waterAmount!;
+      _isLoading = false;
+    } else {
+      // Fetch water intake
+      _fetchWaterIntake();
+    }
+  }
+
+  @override
+  void didUpdateWidget(WaterTrackerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // If date changed or water amount was updated, refresh the data
+    if (widget.date != oldWidget.date || widget.waterAmount != oldWidget.waterAmount) {
+      if (widget.waterAmount != null) {
+        setState(() {
+          _totalWaterAmount = widget.waterAmount!;
+          _isLoading = false;
+        });
+      } else if (widget.date != oldWidget.date) {
+        _fetchWaterIntake();
+      }
+    }
   }
 
   @override
@@ -43,36 +76,11 @@ class _WaterTrackerWidgetState extends State<WaterTrackerWidget> with SingleTick
     });
     
     try {
-      final apiService = ApiService();
-      final waterIntakeList = await apiService.getWaterIntake();
-      
-      // Calculate total water amount from all entries for today
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      
-      double totalToday = 0.0;
-      for (final intake in waterIntakeList) {
-        // Parse timestamp string to DateTime
-        final timestamp = DateTime.parse(intake['timestamp'] as String);
-        final intakeDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
-        
-        // Check if the intake is from today
-        if (intakeDate.isAtSameMomentAs(today)) {
-          // Handle both int and double types safely
-          final amount = intake['amount'];
-          if (amount is int) {
-            totalToday += amount.toDouble();
-          } else if (amount is double) {
-            totalToday += amount;
-          } else {
-            // Try to parse as double if it's a string
-            totalToday += double.tryParse(amount.toString()) ?? 0.0;
-          }
-        }
-      }
+      // Get water intake for the selected date
+      final waterAmount = await _apiService.getWaterIntakeForDate(widget.date);
       
       setState(() {
-        _totalWaterAmount = totalToday;
+        _totalWaterAmount = waterAmount;
         _isLoading = false;
       });
     } catch (e) {
@@ -83,8 +91,30 @@ class _WaterTrackerWidgetState extends State<WaterTrackerWidget> with SingleTick
     }
   }
 
+  // Check if date is today
+  bool get _isToday {
+    final now = DateTime.now();
+    return widget.date.year == now.year && 
+           widget.date.month == now.month && 
+           widget.date.day == now.day;
+  }
+
   // Add water via API
   Future<void> _addWater() async {
+    // Only allow adding water for today
+    if (!_isToday) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'You can only add water for today',
+            style: GoogleFonts.poppins(),
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
     if (_isAdding) return;
     
     setState(() {
@@ -92,8 +122,7 @@ class _WaterTrackerWidgetState extends State<WaterTrackerWidget> with SingleTick
     });
     
     try {
-      final apiService = ApiService();
-      await apiService.addWaterIntake(_glassSize);
+      await _apiService.addWaterIntake(_glassSize);
       
       setState(() {
         _totalWaterAmount += _glassSize;
@@ -195,6 +224,8 @@ class _WaterTrackerWidgetState extends State<WaterTrackerWidget> with SingleTick
                         : IconButton(
                             icon: const Icon(Icons.add_circle, color: Colors.blue),
                             onPressed: _addWater,
+                            // Disable the button for past dates
+                            color: _isToday ? Colors.blue : Colors.blue.withOpacity(0.4),
                           ),
                   ],
                 ),

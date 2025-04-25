@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 
 class ApiService {
   // Base URL for API
-  static const String baseUrl = 'http://192.168.29.249:8000';
+  static const String baseUrl = 'http://192.168.0.174:8000';
   
   // Djoser Authentication Endpoints
   static const String registerEndpoint = '/auth/users/';
@@ -850,6 +850,42 @@ class ApiService {
     }
   }
   
+  // Get water intake for a specific date
+  Future<double> getWaterIntakeForDate(DateTime date) async {
+    try {
+      // Normalize the date to remove time component
+      final targetDate = DateTime(date.year, date.month, date.day);
+      
+      final waterIntakeList = await getWaterIntake();
+      
+      double totalForDate = 0.0;
+      for (final intake in waterIntakeList) {
+        // Parse timestamp string to DateTime
+        final timestamp = DateTime.parse(intake['timestamp'] as String);
+        final intakeDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
+        
+        // Check if the intake is from the target date
+        if (intakeDate.isAtSameMomentAs(targetDate)) {
+          // Handle both int and double types safely
+          final amount = intake['amount'];
+          if (amount is int) {
+            totalForDate += amount.toDouble();
+          } else if (amount is double) {
+            totalForDate += amount;
+          } else {
+            // Try to parse as double if it's a string
+            totalForDate += double.tryParse(amount.toString()) ?? 0.0;
+          }
+        }
+      }
+      
+      return totalForDate;
+    } catch (e) {
+      print('Error fetching water intake for date: $e');
+      return 0.0;
+    }
+  }
+  
   // Add water intake
   Future<Map<String, dynamic>> addWaterIntake(double amount) async {
     try {
@@ -924,18 +960,24 @@ class ApiService {
     }
   }
 
-  // Get combined daily data
+  // Get all daily data for a specific date
   Future<Map<String, dynamic>> getDailyData(DateTime date) async {
+    // Get date for the next day since end date is exclusive
+    final nextDate = date.add(const Duration(days: 1));
+    
     try {
-      // Get the date in YYYY-MM-DD format
-      final today = DateTime(date.year, date.month, date.day);
-      final tomorrow = today.add(const Duration(days: 1));
-      
       // Fetch daily goals
       final dailyGoals = await getDailyGoals();
       
-      // Fetch today's food logs
-      final foodLogs = await getFoodLogs(today, tomorrow);
+      // Fetch food logs for the specific date
+      final foodLogs = await getFoodLogs(date, nextDate);
+      
+      // Fetch water intake for the specific date
+      final waterIntake = await getWaterIntakeForDate(date);
+      
+      // Process food logs
+      final timeFormat = DateFormat('h:mm a');
+      final dayFoodEntries = <Map<String, dynamic>>[];
       
       // Calculate consumed nutrition values
       double caloriesConsumed = 0.0;
@@ -943,38 +985,29 @@ class ApiService {
       double carbsConsumed = 0.0;
       double fatConsumed = 0.0;
       
-      // Process food logs
-      final todayFoodEntries = <Map<String, dynamic>>[];
-      final timeFormat = DateFormat('h:mm a');
-      
       for (final log in foodLogs) {
         final timestamp = DateTime.parse(log['timestamp'] as String);
-        final logDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
+        // Add formatted time to the log
+        log['formatted_time'] = timeFormat.format(timestamp);
         
-        // Only include logs from today
-        if (logDate.isAtSameMomentAs(today)) {
-          // Add formatted time to the log
-          log['formatted_time'] = timeFormat.format(timestamp);
-          
-          // Add to food entries for display
-          todayFoodEntries.add(log);
-          
-          // Sum up nutrients
-          caloriesConsumed += (log['calories'] as num?)?.toDouble() ?? 0.0;
-          proteinConsumed += (log['protein'] as num?)?.toDouble() ?? 0.0;
-          carbsConsumed += (log['carbohydrates'] as num?)?.toDouble() ?? 0.0;
-          fatConsumed += (log['fat'] as num?)?.toDouble() ?? 0.0;
-        }
+        // Add to food entries for display
+        dayFoodEntries.add(log);
+        
+        // Sum up nutrients
+        caloriesConsumed += (log['calories'] as num?)?.toDouble() ?? 0.0;
+        proteinConsumed += (log['protein'] as num?)?.toDouble() ?? 0.0;
+        carbsConsumed += (log['carbohydrates'] as num?)?.toDouble() ?? 0.0;
+        fatConsumed += (log['fat'] as num?)?.toDouble() ?? 0.0;
       }
       
       // Sort food entries by timestamp (newest first)
-      todayFoodEntries.sort((a, b) {
+      dayFoodEntries.sort((a, b) {
         final aTime = DateTime.parse(a['timestamp'] as String);
         final bTime = DateTime.parse(b['timestamp'] as String);
         return bTime.compareTo(aTime);
       });
       
-      // Prepare nutrition data
+      // Create nutrition data structure
       final nutritionData = {
         'calories': {
           'consumed': caloriesConsumed,
@@ -996,11 +1029,22 @@ class ApiService {
       
       return {
         'nutritionData': nutritionData,
-        'foodEntries': todayFoodEntries,
+        'foodEntries': dayFoodEntries,
+        'waterIntake': waterIntake,
       };
     } catch (e) {
-      print('Error in getDailyData: $e');
-      rethrow;
+      print('Error fetching daily data: $e');
+      // Return empty data structure in case of error
+      return {
+        'nutritionData': {
+          'calories': {'consumed': 0.0, 'goal': 2000.0},
+          'protein': {'consumed': 0.0, 'goal': 50.0},
+          'carbohydrates': {'consumed': 0.0, 'goal': 250.0},
+          'fat': {'consumed': 0.0, 'goal': 70.0},
+        },
+        'foodEntries': [],
+        'waterIntake': 0.0,
+      };
     }
   }
 } 

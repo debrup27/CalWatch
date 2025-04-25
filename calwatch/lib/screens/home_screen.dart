@@ -32,6 +32,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // API service
   late ApiService _apiService;
   
+  // Water intake value
+  double _waterIntake = 0.0;
+  
   // Nutrition data
   Map<String, dynamic> _nutritionData = {
     'calories': {
@@ -67,9 +70,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       duration: const Duration(milliseconds: 1500),
     );
     
+    // Initialize _selectedDate immediately to avoid LateInitializationError
+    _selectedDate = DateTime.now();
+    
     // Fetch data after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _selectedDate = DateTime.now();
       _fetchDailyData();
     });
     
@@ -92,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       setState(() {
         _nutritionData = data['nutritionData'];
         _foodEntries = data['foodEntries'];
+        _waterIntake = data['waterIntake'] as double;
         _isLoading = false;
         
         // Update streak data - this is dummy data for now
@@ -100,13 +106,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _isOnStreak = true; // Example streak status
       });
     } catch (e) {
+      print('Error fetching daily data: $e');
       setState(() {
         _isLoading = false;
         // For demo purposes, set some streak data even when API fails
         _streakCount = 7;
         _isOnStreak = true;
       });
-      // ... existing error handling code ...
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to fetch daily data: $e',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
   
@@ -315,6 +334,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     
                     // Water consumption using our new widget
                     WaterTrackerWidget(
+                      date: _selectedDate,
+                      waterAmount: _waterIntake,
                       onAddWater: () {
                         // Optional callback when water is added - could be used for showing a toast
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -327,6 +348,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             duration: const Duration(seconds: 1),
                           ),
                         );
+                        // Refresh data after adding water
+                        _fetchDailyData();
                       },
                     ),
                     
