@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import '../services/streak_service.dart';
 import 'package:intl/intl.dart';
 import '../services/groq_service.dart';
+import '../widgets/stellar_token_info.dart';
 
 class StreakScreen extends StatefulWidget {
   final int streakCount;
@@ -325,6 +326,47 @@ class _StreakScreenState extends State<StreakScreen> with SingleTickerProviderSt
                             ),
                           ],
                         ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 30),
+                    
+                    // Streak Token Information
+                    const StellarTokenInfo(),
+                    
+                    // Streak token refresh button
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Center(
+                        child: TextButton.icon(
+                          onPressed: () async {
+                            try {
+                              await _streakService.debugRepairDistributorAccount();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Streak token refresh initiated'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.refresh, size: 16, color: Colors.white70),
+                          label: Text(
+                            'Click to refresh if streak token not updated',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     

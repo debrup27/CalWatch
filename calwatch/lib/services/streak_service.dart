@@ -451,6 +451,13 @@ class StreakService {
     final today = DateTime(now.year, now.month, now.day);
     await prefs.setString(_lastStreakDateKey, today.toIso8601String());
     
+    // Clear penalty if it was active
+    final isPenalty = await isPenaltyActive();
+    if (isPenalty) {
+      await prefs.setBool(_penaltyActiveKey, false);
+      await prefs.remove(_missedDateKey);
+    }
+    
     // Update streak history
     _updateStreakHistory(today, newStreak);
     
@@ -471,7 +478,8 @@ class StreakService {
       'newStreak': newStreak,
       'change': amount,
       'date': today.toIso8601String(),
-      'blockchainRecord': blockchainRecord
+      'blockchainRecord': blockchainRecord,
+      'penaltyRemoved': isPenalty
     };
   }
   
@@ -502,6 +510,14 @@ class StreakService {
     final today = DateTime(now.year, now.month, now.day);
     await prefs.setString(_lastStreakDateKey, today.toIso8601String());
     
+    // If streak is set to 0, activate penalty
+    bool penaltyActivated = false;
+    if (newStreak == 0 && currentStreak > 0) {
+      await prefs.setBool(_penaltyActiveKey, true);
+      await prefs.setString(_missedDateKey, today.toIso8601String());
+      penaltyActivated = true;
+    }
+    
     // Update streak history
     _updateStreakHistory(today, newStreak);
     
@@ -522,7 +538,8 @@ class StreakService {
       'newStreak': newStreak,
       'change': -amount,
       'date': today.toIso8601String(),
-      'blockchainRecord': blockchainRecord
+      'blockchainRecord': blockchainRecord,
+      'penaltyActivated': penaltyActivated
     };
   }
   
@@ -538,6 +555,25 @@ class StreakService {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     await prefs.setString(_lastStreakDateKey, today.toIso8601String());
+    
+    // Handle penalty based on streak value
+    bool penaltyActivated = false;
+    bool penaltyRemoved = false;
+    
+    // Get current penalty status
+    final isPenalty = await isPenaltyActive();
+    
+    if (newStreak == 0 && currentStreak > 0) {
+      // Setting streak to 0 activates penalty
+      await prefs.setBool(_penaltyActiveKey, true);
+      await prefs.setString(_missedDateKey, today.toIso8601String());
+      penaltyActivated = true;
+    } else if (newStreak > 0 && isPenalty) {
+      // Setting streak to > 0 removes penalty
+      await prefs.setBool(_penaltyActiveKey, false);
+      await prefs.remove(_missedDateKey);
+      penaltyRemoved = true;
+    }
     
     // Update streak history
     _updateStreakHistory(today, newStreak);
@@ -559,7 +595,9 @@ class StreakService {
       'newStreak': newStreak,
       'change': newStreak - currentStreak,
       'date': today.toIso8601String(),
-      'blockchainRecord': blockchainRecord
+      'blockchainRecord': blockchainRecord,
+      'penaltyActivated': penaltyActivated,
+      'penaltyRemoved': penaltyRemoved
     };
   }
   

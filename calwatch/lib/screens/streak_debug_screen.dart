@@ -62,13 +62,16 @@ class _StreakDebugScreenState extends State<StreakDebugScreen> {
       await _loadStreakInfo();
       
       final hasBlockchainRecord = result['blockchainRecord'] != null;
+      final penaltyRemoved = result['penaltyRemoved'] ?? false;
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            hasBlockchainRecord 
-                ? 'Streak incremented by 1 and recorded on blockchain' 
-                : 'Streak incremented by 1'
+            penaltyRemoved
+                ? 'Streak incremented by 1, penalty removed' 
+                : (hasBlockchainRecord 
+                    ? 'Streak incremented by 1 and recorded on blockchain' 
+                    : 'Streak incremented by 1')
           ),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 2),
@@ -92,13 +95,16 @@ class _StreakDebugScreenState extends State<StreakDebugScreen> {
       await _loadStreakInfo();
       
       final hasBlockchainRecord = result['blockchainRecord'] != null;
+      final penaltyActivated = result['penaltyActivated'] ?? false;
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            hasBlockchainRecord 
-                ? 'Streak decremented by 1 and recorded on blockchain' 
-                : 'Streak decremented by 1'
+            penaltyActivated
+                ? 'Streak decremented to 0, penalty day activated' 
+                : (hasBlockchainRecord 
+                    ? 'Streak decremented by 1 and recorded on blockchain' 
+                    : 'Streak decremented by 1')
           ),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 2),
@@ -137,14 +143,21 @@ class _StreakDebugScreenState extends State<StreakDebugScreen> {
       await _loadStreakInfo();
       
       final hasBlockchainRecord = result['blockchainRecord'] != null;
+      final penaltyActivated = result['penaltyActivated'] ?? false;
+      final penaltyRemoved = result['penaltyRemoved'] ?? false;
+      
+      String message = 'Streak set to $value';
+      if (penaltyActivated) {
+        message += ', penalty day activated';
+      } else if (penaltyRemoved) {
+        message += ', penalty removed';
+      } else if (hasBlockchainRecord) {
+        message += ' and recorded on blockchain';
+      }
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            hasBlockchainRecord 
-                ? 'Streak set to $value and recorded on blockchain' 
-                : 'Streak set to $value'
-          ),
+          content: Text(message),
           backgroundColor: Colors.blue,
         ),
       );

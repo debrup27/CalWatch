@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 
 class ApiService {
   // Base URL for API
-  static const String baseUrl = 'http://192.168.0.105:8000';
+  static const String baseUrl = 'http://192.168.0.174:8000';
   
   // Djoser Authentication Endpoints
   static const String registerEndpoint = '/auth/users/';

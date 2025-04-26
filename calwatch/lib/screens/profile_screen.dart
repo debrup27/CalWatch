@@ -11,7 +11,6 @@ import 'user_details_screen.dart';
 import 'streak_debug_screen.dart';
 import 'wallet_setup_screen.dart';
 import 'contract_setup_screen.dart';
-import '../widgets/stellar_token_info.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -294,9 +293,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       // Settings section
                       _buildSettingsSection(),
-                      
-                      const SizedBox(height: 20),
-                      _isLoading ? const Center(child: CircularProgressIndicator()) : const StellarTokenInfo(),
                       
                       const SizedBox(height: 20),
                       
