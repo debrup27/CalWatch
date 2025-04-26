@@ -257,16 +257,11 @@ class _NutritionistScreenState extends State<NutritionistScreen> with SingleTick
   // Extract and save nutrition values from Padma's response
   Future<void> _extractAndSaveNutritionValues(String response) async {
     try {
-      // Regular expressions to extract nutrition values - updated to match the specific format in the response
-      final caloriesRegex = RegExp(r'daily calorie recommendation:?\s*\*?\*?(\d+)\s*calories', caseSensitive: false);
-      final proteinRegex = RegExp(r'protein:?\s*\*?\*?(\d+)g', caseSensitive: false);
-      final carbsRegex = RegExp(r'carb(?:ohydrate)?s?:?\s*\*?\*?(\d+)g', caseSensitive: false);
-      final fatRegex = RegExp(r'fat:?\s*\*?\*?(\d+)g', caseSensitive: false);
-      
-      // Extract values - search in first 1000 characters to avoid meal-specific values
-      String topPortion = response.length > 1000 ? response.substring(0, 1000) : response;
-      
-      // print('Searching for nutrition values in: ${topPortion.substring(0, math.min(200, topPortion.length))}...');
+      // Regular expressions to extract nutrition values
+      final caloriesRegex = RegExp(r'(\d+)[\s-]*calories', caseSensitive: false);
+      final proteinRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*protein', caseSensitive: false);
+      final carbsRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*carb(?:ohydrate)?s?', caseSensitive: false);
+      final fatRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*fat', caseSensitive: false);
       
       // Extract values
       int? calories;
@@ -274,28 +269,24 @@ class _NutritionistScreenState extends State<NutritionistScreen> with SingleTick
       int? carbs;
       int? fat;
       
-      final caloriesMatch = caloriesRegex.firstMatch(topPortion);
+      final caloriesMatch = caloriesRegex.firstMatch(response);
       if (caloriesMatch != null && caloriesMatch.groupCount >= 1) {
         calories = int.tryParse(caloriesMatch.group(1)!);
-        print('Found calories: $calories');
       }
       
-      final proteinMatch = proteinRegex.firstMatch(topPortion);
+      final proteinMatch = proteinRegex.firstMatch(response);
       if (proteinMatch != null && proteinMatch.groupCount >= 1) {
         protein = int.tryParse(proteinMatch.group(1)!);
-        print('Found protein: $protein');
       }
       
-      final carbsMatch = carbsRegex.firstMatch(topPortion);
+      final carbsMatch = carbsRegex.firstMatch(response);
       if (carbsMatch != null && carbsMatch.groupCount >= 1) {
         carbs = int.tryParse(carbsMatch.group(1)!);
-        print('Found carbs: $carbs');
       }
       
-      final fatMatch = fatRegex.firstMatch(topPortion);
+      final fatMatch = fatRegex.firstMatch(response);
       if (fatMatch != null && fatMatch.groupCount >= 1) {
         fat = int.tryParse(fatMatch.group(1)!);
-        print('Found fat: $fat');
       }
       
       // If we found at least one value, save to backend
