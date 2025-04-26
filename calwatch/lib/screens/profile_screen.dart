@@ -11,6 +11,7 @@ import 'user_details_screen.dart';
 import 'streak_debug_screen.dart';
 import 'wallet_setup_screen.dart';
 import 'contract_setup_screen.dart';
+import '../widgets/stellar_token_info.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -293,6 +294,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       // Settings section
                       _buildSettingsSection(),
+                      
+                      const SizedBox(height: 20),
+                      _isLoading ? const Center(child: CircularProgressIndicator()) : const StellarTokenInfo(),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // User section
+                      _buildUserSection(),
                     ],
                   ),
                 ),
@@ -1151,5 +1160,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     });
+  }
+
+  Widget _buildUserSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[800]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Account Information',
+            style: GoogleFonts.montserrat(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // User account info
+          _buildAccountInfoItem(Icons.person_outline, 'Username', _username),
+          _buildAccountInfoItem(Icons.email_outlined, 'Email', _email),
+          if (_firstName.isNotEmpty || _lastName.isNotEmpty)
+            _buildAccountInfoItem(Icons.badge_outlined, 'Name', '$_firstName $_lastName'),
+          
+          const SizedBox(height: 8),
+          const Divider(color: Colors.grey),
+          const SizedBox(height: 8),
+          
+          Text(
+            'App Info',
+            style: GoogleFonts.montserrat(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          _buildAccountInfoItem(Icons.info_outline, 'Version', '1.0.0'),
+          _buildAccountInfoItem(Icons.code, 'Build', '2025.04.26'),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildAccountInfoItem(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 20,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    color: Colors.grey[400],
+                  ),
+                ),
+                Text(
+                  value,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 } 

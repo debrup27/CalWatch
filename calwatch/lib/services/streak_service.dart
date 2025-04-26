@@ -1,6 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'monad_service.dart';
+import 'stellar_service.dart';
+import 'dart:developer' as developer;
 
 class StreakService {
   // Singleton pattern
@@ -26,7 +28,7 @@ class StreakService {
     return prefs.getInt(_streakCountKey) ?? 0;
   }
   
-  // Sync local streak with blockchain if needed
+  // Sync with blockchain but don't update local streak
   Future<void> syncWithBlockchain() async {
     try {
       final monadService = MonadService();
@@ -41,7 +43,7 @@ class StreakService {
       // Initialize blockchain service
       await monadService.initialize();
       
-      // Get blockchain streak
+      // Get blockchain streak (for logging purposes only)
       final blockchainStreak = await monadService.getStreakFromContract();
       
       // Get local streak
@@ -55,14 +57,9 @@ class StreakService {
       
       print('Blockchain streak: $blockchainStreak, Local streak: $localStreak, Last action day: $lastActionDay, Today: $today');
       
-      // Update local streak if blockchain has a newer record
+      // No longer update local streak from blockchain
+      // Instead, we only record the sync date
       final prefs = await SharedPreferences.getInstance();
-      if (blockchainStreak != localStreak) {
-        await prefs.setInt(_streakCountKey, blockchainStreak);
-        print('Updated local streak from blockchain: $blockchainStreak');
-      }
-      
-      // Record last sync date
       await prefs.setString(_lastSyncDateKey, DateTime.now().toIso8601String());
     } catch (e) {
       print('Error syncing with blockchain: $e');
@@ -138,8 +135,8 @@ class StreakService {
   
   // Update streak based on today's nutrition data
   Future<Map<String, dynamic>> updateStreak(Map<String, dynamic> nutritionData) async {
-    // First sync with blockchain to make sure we have the latest streak data
-    await syncWithBlockchain();
+    // Removed blockchain sync before updating streak
+    // This decouples our local streak from blockchain
     
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
@@ -214,8 +211,12 @@ class StreakService {
         if (blockchainRecord != null) {
           _saveBlockchainRecord(today, newStreak, blockchainRecord);
           
-          // After recording, sync again to ensure we have latest blockchain data
-          await syncWithBlockchain();
+          // Removed sync with blockchain - we don't want to get values from it
+        }
+        
+        // NEW: Check if this is a streak milestone that deserves Stellar token reward
+        if (newStreak == 3 || newStreak == 7 || newStreak == 30) {
+          await _rewardStellarTokens(newStreak);
         }
       }
     } else {
@@ -234,16 +235,19 @@ class StreakService {
         // Update streak history
         _updateStreakHistory(today, newStreak);
         
-        // No need to record to blockchain - streak breaks are handled automatically
-        // by the smart contract when the next recordAction is called
+        // Still record to blockchain, but don't read values from it
+        final blockchainRecord = await _recordStreakOnBlockchain(newStreak, goalsMet, today);
+        if (blockchainRecord != null) {
+          _saveBlockchainRecord(today, newStreak, blockchainRecord);
+        }
       }
     }
     
     // Check if we have any blockchain records
     final blockchainRecords = await getBlockchainRecords();
     
-    // Get current streak from blockchain (may differ from local)
-    int onChainStreak = newStreak;
+    // Get current streak from blockchain (for reference only)
+    int? onChainStreak;
     bool hasWallet = false;
     try {
       final monadService = MonadService();
@@ -398,13 +402,38 @@ class StreakService {
   // Reset streak (for debugging or admin purposes)
   Future<void> resetStreak() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_streakCountKey);
-    await prefs.remove(_lastStreakDateKey);
-    await prefs.remove(_penaltyActiveKey);
-    await prefs.remove(_missedDateKey);
     
-    // Try to sync with blockchain to reset to blockchain state
-    await syncWithBlockchain();
+    try {
+      // Reset local streak to 0
+      await prefs.setInt(_streakCountKey, 0);
+      
+      // Update last streak date to today
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      await prefs.setString(_lastStreakDateKey, today.toIso8601String());
+      
+      // Clear penalty and missed date
+      await prefs.remove(_penaltyActiveKey);
+      await prefs.remove(_missedDateKey);
+      
+      // Update streak history to record the reset
+      _updateStreakHistory(today, 0);
+      
+      // Record the reset on blockchain for tracking purposes only
+      final monadService = MonadService();
+      final isWalletSetup = await monadService.isWalletSetup();
+      
+      if (isWalletSetup) {
+        await monadService.initialize();
+        // Still record to blockchain but don't use its value
+        await monadService.recordStreak(0, false, today);
+      }
+      
+      // Note that we're NOT syncing with blockchain after reset
+      // This prevents the blockchain from affecting our local streak
+    } catch (e) {
+      print('Error resetting streak: $e');
+    }
   }
   
   // DEBUGGING METHODS
@@ -425,10 +454,16 @@ class StreakService {
     // Update streak history
     _updateStreakHistory(today, newStreak);
     
-    // Record on blockchain if possible
-    final blockchainRecord = await _recordStreakOnBlockchain(newStreak, true, today);
-    if (blockchainRecord != null) {
-      _saveBlockchainRecord(today, newStreak, blockchainRecord);
+    // Record on blockchain if possible, but don't sync back
+    Map<String, dynamic>? blockchainRecord;
+    try {
+      blockchainRecord = await _recordStreakOnBlockchain(newStreak, true, today);
+      if (blockchainRecord != null) {
+        _saveBlockchainRecord(today, newStreak, blockchainRecord);
+      }
+    } catch (e) {
+      print('Error recording to blockchain: $e');
+      // Continue without blockchain recording
     }
     
     return {
@@ -470,10 +505,16 @@ class StreakService {
     // Update streak history
     _updateStreakHistory(today, newStreak);
     
-    // Record on blockchain if possible
-    final blockchainRecord = await _recordStreakOnBlockchain(newStreak, false, today);
-    if (blockchainRecord != null) {
-      _saveBlockchainRecord(today, newStreak, blockchainRecord);
+    // Record on blockchain if possible, but don't sync back
+    Map<String, dynamic>? blockchainRecord;
+    try {
+      blockchainRecord = await _recordStreakOnBlockchain(newStreak, false, today);
+      if (blockchainRecord != null) {
+        _saveBlockchainRecord(today, newStreak, blockchainRecord);
+      }
+    } catch (e) {
+      print('Error recording to blockchain: $e');
+      // Continue without blockchain recording
     }
     
     return {
@@ -501,10 +542,16 @@ class StreakService {
     // Update streak history
     _updateStreakHistory(today, newStreak);
     
-    // Record on blockchain if possible
-    final blockchainRecord = await _recordStreakOnBlockchain(newStreak, true, today);
-    if (blockchainRecord != null) {
-      _saveBlockchainRecord(today, newStreak, blockchainRecord);
+    // Record on blockchain if possible, but don't sync back
+    Map<String, dynamic>? blockchainRecord;
+    try {
+      blockchainRecord = await _recordStreakOnBlockchain(newStreak, true, today);
+      if (blockchainRecord != null) {
+        _saveBlockchainRecord(today, newStreak, blockchainRecord);
+      }
+    } catch (e) {
+      print('Error recording to blockchain: $e');
+      // Continue without blockchain recording
     }
     
     return {
@@ -580,5 +627,215 @@ class StreakService {
         'lastSyncDateKey': prefs.getString(_lastSyncDateKey),
       }
     };
+  }
+  
+  // NEW: Reward Stellar tokens for streak milestones
+  Future<bool> _rewardStellarTokens(int streakDays) async {
+    developer.log("[StreakService] Attempting to reward Stellar tokens for streak: $streakDays days");
+    try {
+      // Initialize Stellar service
+      final stellarService = StellarStreakTokenService();
+      developer.log("[StreakService] Initializing Stellar service");
+      await stellarService.initialize();
+      
+      // Get current token balance before reward
+      final beforeBalance = await stellarService.getUserTokenBalance();
+      developer.log("[StreakService] Current token balance before reward: $beforeBalance");
+      
+      // Get account verification info
+      developer.log("[StreakService] Verifying Stellar accounts");
+      final accountInfo = await stellarService.verifyAccounts();
+      developer.log("[StreakService] Account verification results: $accountInfo");
+      
+      // Issue reward tokens based on streak milestone
+      developer.log("[StreakService] Calling rewardUserForStreak method");
+      final success = await stellarService.rewardUserForStreak(streakDays);
+      
+      if (success) {
+        // Get new balance
+        final afterBalance = await stellarService.getUserTokenBalance();
+        developer.log("[StreakService] Successfully rewarded user with Stellar tokens for $streakDays day streak");
+        developer.log("[StreakService] Balance before: $beforeBalance, Balance after: $afterBalance");
+      } else {
+        developer.log("[StreakService] Failed to reward user with Stellar tokens");
+      }
+      
+      return success;
+    } catch (e) {
+      developer.log("[StreakService] Error rewarding Stellar tokens: $e", error: e);
+      return false;
+    }
+  }
+  
+  // Get user's Stellar token balance
+  Future<String> getStellarTokenBalance() async {
+    try {
+      developer.log("[StreakService] Getting Stellar token balance");
+      final stellarService = StellarStreakTokenService();
+      await stellarService.initialize();
+      
+      final balance = await stellarService.getUserTokenBalance();
+      developer.log("[StreakService] Current token balance: $balance");
+      return balance;
+    } catch (e) {
+      developer.log("[StreakService] Error getting Stellar token balance: $e", error: e);
+      return "0";
+    }
+  }
+  
+  // Get Stellar account info
+  Future<Map<String, String>> getStellarAccountInfo() async {
+    try {
+      developer.log("[StreakService] Getting Stellar account info");
+      final stellarService = StellarStreakTokenService();
+      await stellarService.initialize();
+      
+      final info = await stellarService.getAccountInfo();
+      developer.log("[StreakService] Account info: $info");
+      return info;
+    } catch (e) {
+      developer.log("[StreakService] Error getting Stellar account info: $e", error: e);
+      return {};
+    }
+  }
+  
+  // Check if current streak matches reward milestone
+  Future<bool> isAtRewardMilestone() async {
+    final currentStreak = await getStreakCount();
+    developer.log("[StreakService] Checking if streak $currentStreak is at reward milestone");
+    return currentStreak == 3 || currentStreak == 7 || currentStreak == 30;
+  }
+  
+  // Debug: Force reward for current streak (for testing)
+  Future<Map<String, dynamic>> debugForceReward() async {
+    try {
+      developer.log("[StreakService] DEBUG: Forcing reward for current streak");
+      final currentStreak = await getStreakCount();
+      developer.log("[StreakService] Current streak: $currentStreak");
+      
+      // Create Stellar service
+      final stellarService = StellarStreakTokenService();
+      await stellarService.initialize();
+      
+      // Get account verification before reward
+      final beforeInfo = await stellarService.verifyAccounts();
+      developer.log("[StreakService] DEBUG: Account verification before reward: $beforeInfo");
+      
+      // Get token balance before reward
+      final beforeBalance = await stellarService.getUserTokenBalance();
+      developer.log("[StreakService] DEBUG: Token balance before reward: $beforeBalance");
+      
+      // Force reward regardless of milestone
+      developer.log("[StreakService] DEBUG: Forcing reward for streak: $currentStreak");
+      bool rewardSuccess = false;
+      String rewardError = "";
+      try {
+        // First try regular milestone rewards
+        rewardSuccess = await _rewardStellarTokens(currentStreak);
+        if (!rewardSuccess) {
+          // If that fails, try a supported milestone (for testing)
+          int testMilestone = 3; // Use 3-day streak as test milestone
+          developer.log("[StreakService] DEBUG: Regular reward failed, trying with test milestone: $testMilestone");
+          rewardSuccess = await stellarService.rewardUserForStreak(testMilestone);
+        }
+      } catch (e) {
+        rewardSuccess = false;
+        rewardError = e.toString();
+        developer.log("[StreakService] DEBUG: Error forcing reward: $e", error: e);
+      }
+      
+      // Get account verification after reward
+      final afterInfo = await stellarService.verifyAccounts();
+      developer.log("[StreakService] DEBUG: Account verification after reward: $afterInfo");
+      
+      // Get token balance after reward
+      final afterBalance = await stellarService.getUserTokenBalance();
+      developer.log("[StreakService] DEBUG: Token balance after reward: $afterBalance");
+      
+      return {
+        'streak': currentStreak,
+        'rewardSuccess': rewardSuccess,
+        'rewardError': rewardError,
+        'beforeBalance': beforeBalance,
+        'afterBalance': afterBalance,
+        'accountInfo': await stellarService.getAccountInfo(),
+      };
+    } catch (e) {
+      developer.log("[StreakService] DEBUG: Error in debugForceReward: $e", error: e);
+      return {
+        'error': e.toString(),
+      };
+    }
+  }
+  
+  // Debug: Verify the reward system
+  Future<Map<String, dynamic>> debugVerifyRewardSystem() async {
+    try {
+      developer.log("[StreakService] DEBUG: Verifying reward system");
+      final result = <String, dynamic>{};
+      
+      // Get current streak
+      final currentStreak = await getStreakCount();
+      result['currentStreak'] = currentStreak;
+      
+      // Create Stellar service
+      final stellarService = StellarStreakTokenService();
+      await stellarService.initialize();
+      
+      // Get account verification
+      result['accountVerification'] = await stellarService.verifyAccounts();
+      
+      // Check if at milestone
+      result['isAtMilestone'] = currentStreak == 3 || currentStreak == 7 || currentStreak == 30;
+      
+      // Get cached reward milestone
+      final prefs = await SharedPreferences.getInstance();
+      result['lastRewardedStreak'] = prefs.getInt('stellar_last_rewarded_streak') ?? 0;
+      
+      // Get the last rewarded cycle
+      result['lastRewardedCycle'] = prefs.getString('stellar_last_rewarded_cycle') ?? '';
+      
+      // Get current streak cycle ID
+      final currentCycleId = await stellarService.getCurrentStreakCycleId();
+      result['currentCycleId'] = currentCycleId;
+      
+      // Check if eligible for reward - now we consider different streak cycles
+      final bool isSameCycle = (result['lastRewardedStreak'] == currentStreak && 
+                               result['lastRewardedCycle'] == currentCycleId);
+      
+      // Eligible if at a milestone and not rewarded in this cycle yet
+      result['eligibleForReward'] = result['isAtMilestone'] && !isSameCycle;
+      
+      developer.log("[StreakService] DEBUG: Reward system verification: $result");
+      
+      return result;
+    } catch (e) {
+      developer.log("[StreakService] DEBUG: Error verifying reward system: $e", error: e);
+      return {
+        'error': e.toString(),
+      };
+    }
+  }
+  
+  // Debug: Repair distributor account
+  Future<Map<String, dynamic>> debugRepairDistributorAccount() async {
+    try {
+      developer.log("[StreakService] DEBUG: Repairing distributor account");
+      
+      // Create Stellar service
+      final stellarService = StellarStreakTokenService();
+      await stellarService.initialize();
+      
+      // Call repair function
+      final result = await stellarService.repairDistributorAccount();
+      
+      developer.log("[StreakService] DEBUG: Distributor account repair result: $result");
+      return result;
+    } catch (e) {
+      developer.log("[StreakService] DEBUG: Error repairing distributor account: $e", error: e);
+      return {
+        'error': e.toString(),
+      };
+    }
   }
 } 

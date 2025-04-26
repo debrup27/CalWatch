@@ -18,6 +18,7 @@ class _StreakDebugScreenState extends State<StreakDebugScreen> {
   bool _isLoading = false;
   bool _hasWallet = false;
   final TextEditingController _streakValueController = TextEditingController();
+  String _debugOutput = '';
 
   @override
   void initState() {
@@ -253,6 +254,155 @@ class _StreakDebugScreenState extends State<StreakDebugScreen> {
 
                   // Streak history
                   _buildHistoryCard(),
+
+                  // Add this new section for Stellar token debugging
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Stellar Token Debug',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Get Stellar account info
+                  ElevatedButton(
+                    onPressed: () async {
+                      setState(() {
+                        _isLoading = true;
+                      });
+                      try {
+                        final info = await _streakService.getStellarAccountInfo();
+                        setState(() {
+                          _debugOutput = 'Account Info: $info';
+                          _isLoading = false;
+                        });
+                      } catch (e) {
+                        setState(() {
+                          _debugOutput = 'Error: $e';
+                          _isLoading = false;
+                        });
+                      }
+                    },
+                    child: const Text('Get Stellar Account Info'),
+                  ),
+                  const SizedBox(height: 10),
+                  // Get Stellar token balance
+                  ElevatedButton(
+                    onPressed: () async {
+                      setState(() {
+                        _isLoading = true;
+                      });
+                      try {
+                        final balance = await _streakService.getStellarTokenBalance();
+                        setState(() {
+                          _debugOutput = 'Token Balance: $balance';
+                          _isLoading = false;
+                        });
+                      } catch (e) {
+                        setState(() {
+                          _debugOutput = 'Error: $e';
+                          _isLoading = false;
+                        });
+                      }
+                    },
+                    child: const Text('Get Token Balance'),
+                  ),
+                  const SizedBox(height: 10),
+                  // Verify reward system
+                  ElevatedButton(
+                    onPressed: () async {
+                      setState(() {
+                        _isLoading = true;
+                      });
+                      try {
+                        final result = await _streakService.debugVerifyRewardSystem();
+                        setState(() {
+                          _debugOutput = 'Reward System Status: $result';
+                          _isLoading = false;
+                        });
+                      } catch (e) {
+                        setState(() {
+                          _debugOutput = 'Error: $e';
+                          _isLoading = false;
+                        });
+                      }
+                    },
+                    child: const Text('Verify Reward System'),
+                  ),
+                  const SizedBox(height: 10),
+                  // Force reward
+                  ElevatedButton(
+                    onPressed: () async {
+                      setState(() {
+                        _isLoading = true;
+                      });
+                      try {
+                        final result = await _streakService.debugForceReward();
+                        setState(() {
+                          _debugOutput = 'Force Reward Result: $result';
+                          _isLoading = false;
+                        });
+                      } catch (e) {
+                        setState(() {
+                          _debugOutput = 'Error: $e';
+                          _isLoading = false;
+                        });
+                      }
+                    },
+                    child: const Text('Force Reward'),
+                  ),
+                  
+                  // Add Repair Distributor Account button
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () async {
+                      setState(() {
+                        _isLoading = true;
+                      });
+                      try {
+                        final result = await _streakService.debugRepairDistributorAccount();
+                        setState(() {
+                          _debugOutput = 'Repair Distributor Account Result: $result';
+                          _isLoading = false;
+                        });
+                      } catch (e) {
+                        setState(() {
+                          _debugOutput = 'Error: $e';
+                          _isLoading = false;
+                        });
+                      }
+                    },
+                    child: const Text('Repair Distributor Account'),
+                  ),
+                  
+                  // Debug output area
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Debug Output:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          child: Text(
+                            _debugOutput,
+                            style: const TextStyle(fontFamily: 'monospace'),
+                          ),
+                        ),
+                  ),
                 ],
               ),
             ),
