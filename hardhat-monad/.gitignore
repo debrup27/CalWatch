@@ -1,7 +1,3 @@
-*.pyc
-
-backend/media/images
-
 node_modules
 .env
 

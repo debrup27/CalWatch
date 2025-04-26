@@ -42,6 +42,9 @@ dependencies:
   shared_preferences: ^2.2.2
   flutter_dotenv: ^5.2.1
   intl: ^0.20.2
+  web3dart: ^2.6.1  # For blockchain integration
+  url_launcher: ^6.1.14  # For opening transaction URLs
+  stellar_flutter_sdk: ^1.6.5  # For Stellar token issuance
 
 dev_dependencies:
   flutter_test:

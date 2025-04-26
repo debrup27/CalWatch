@@ -8,6 +8,10 @@ import 'login_screen.dart';
 import '../services/api_service.dart';
 import 'edit_profile_screen.dart';
 import 'user_details_screen.dart';
+import 'streak_debug_screen.dart';
+import 'wallet_setup_screen.dart';
+import 'contract_setup_screen.dart';
+import '../widgets/stellar_token_info.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -198,16 +202,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _navigateToEditProfile() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EditProfileScreen(
-          username: _username,
-          email: _email,
-          firstName: _firstName,
-          lastName: _lastName,
-          bio: _bio,
-        ),
-      ),
-    ).then((_) => _fetchUserData()); // Refresh data when returning
+      MaterialPageRoute(builder: (context) => EditProfileScreen(
+        username: _username,
+        email: _email,
+        firstName: _firstName,
+        lastName: _lastName,
+        bio: _bio,
+      )),
+    ).then((_) {
+      // Refresh user data when returning from edit screen
+      _fetchUserData();
+    });
   }
   
   void _navigateToUserDetails() {
@@ -219,6 +224,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     ).then((_) => _fetchUserData()); // Refresh data when returning
+  }
+
+  void _navigateToDebugStreak() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const StreakDebugScreen()),
+    );
+  }
+  
+  void _navigateToWalletSetup() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const WalletSetupScreen()),
+    );
+  }
+  
+  void _navigateToContractSetup() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ContractSetupScreen()),
+    );
   }
 
   @override
@@ -268,6 +294,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       // Settings section
                       _buildSettingsSection(),
+                      
+                      const SizedBox(height: 20),
+                      _isLoading ? const Center(child: CircularProgressIndicator()) : const StellarTokenInfo(),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // User section
+                      _buildUserSection(),
                     ],
                   ),
                 ),
@@ -937,6 +971,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildSettingItem(Icons.notifications_outlined, 'Notifications'),
           _buildSettingItem(Icons.lock_outline, 'Privacy'),
           _buildSettingItem(Icons.help_outline, 'Help & Support'),
+          _buildSettingItem(Icons.bug_report, 'Debug Streak'),
+          _buildSettingItem(Icons.account_balance_wallet, 'Wallet Setup'),
+          _buildSettingItem(Icons.receipt_long, 'Contract Setup'),
           _buildSettingItem(Icons.info_outline, 'About'),
           _buildSettingItem(Icons.logout, 'Sign Out', isDestructive: true),
         ],
@@ -960,6 +997,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               break;
             case 'Help & Support':
               // Navigate to help & support
+              break;
+            case 'Debug Streak':
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StreakDebugScreen()),
+              );
+              break;
+            case 'Wallet Setup':
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const WalletSetupScreen()),
+              );
+              break;
+            case 'Contract Setup':
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ContractSetupScreen()),
+              );
               break;
             case 'About':
               // Show about dialog
@@ -1105,5 +1160,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     });
+  }
+
+  Widget _buildUserSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[800]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Account Information',
+            style: GoogleFonts.montserrat(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // User account info
+          _buildAccountInfoItem(Icons.person_outline, 'Username', _username),
+          _buildAccountInfoItem(Icons.email_outlined, 'Email', _email),
+          if (_firstName.isNotEmpty || _lastName.isNotEmpty)
+            _buildAccountInfoItem(Icons.badge_outlined, 'Name', '$_firstName $_lastName'),
+          
+          const SizedBox(height: 8),
+          const Divider(color: Colors.grey),
+          const SizedBox(height: 8),
+          
+          Text(
+            'App Info',
+            style: GoogleFonts.montserrat(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          _buildAccountInfoItem(Icons.info_outline, 'Version', '1.0.0'),
+          _buildAccountInfoItem(Icons.code, 'Build', '2025.04.26'),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildAccountInfoItem(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 20,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    color: Colors.grey[400],
+                  ),
+                ),
+                Text(
+                  value,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 } 
