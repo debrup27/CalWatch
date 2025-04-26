@@ -68,7 +68,7 @@ class _WaterTrackerWidgetState extends State<WaterTrackerWidget> with SingleTick
     _animationController.dispose();
     super.dispose();
   }
-  
+
   // Fetch water intake data from API
   Future<void> _fetchWaterIntake() async {
     setState(() {
@@ -199,19 +199,19 @@ class _WaterTrackerWidgetState extends State<WaterTrackerWidget> with SingleTick
               ),
             )
           : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Water Intake',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Water Intake',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
                     _isAdding
                         ? const SizedBox(
                             height: 20,
@@ -222,56 +222,56 @@ class _WaterTrackerWidgetState extends State<WaterTrackerWidget> with SingleTick
                             ),
                           )
                         : IconButton(
-                            icon: const Icon(Icons.add_circle, color: Colors.blue),
-                            onPressed: _addWater,
+                icon: const Icon(Icons.add_circle, color: Colors.blue),
+                onPressed: _addWater,
                             // Disable the button for past dates
                             color: _isToday ? Colors.blue : Colors.blue.withOpacity(0.4),
-                          ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  height: 45,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 45,
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Stack(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 500),
+                  width: MediaQuery.of(context).size.width * fillPercentage * 0.7,
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.2),
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade300, Colors.blue.shade600],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Stack(
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 500),
-                        width: MediaQuery.of(context).size.width * fillPercentage * 0.7,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.blue.shade300, Colors.blue.shade600],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      Center(
-                        child: Text(
-                          '$glasses / $targetGlasses glasses',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  '${totalWaterAmount.toStringAsFixed(0)} ml of ${dailyTarget.toStringAsFixed(0)} ml',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: 12,
+                Center(
+                  child: Text(
+                          '$glasses / $targetGlasses glasses',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+                  '${totalWaterAmount.toStringAsFixed(0)} ml of ${dailyTarget.toStringAsFixed(0)} ml',
+            style: GoogleFonts.poppins(
+              color: Colors.white70,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 } 

@@ -8,6 +8,8 @@ import 'logs_screen.dart';
 import 'profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 
 // Nebula effect painter
 class NebulaPainter extends CustomPainter {
@@ -218,7 +220,7 @@ class _NutritionistScreenState extends State<NutritionistScreen> with SingleTick
       // Get response from Groq API
       final response = await _groqService.getNutritionistResponse(
         userMessage, 
-        [{'isUser': true, 'message': userMessage}]
+        _messages.sublist(0, _messages.length - 1) // Exclude the message we just sent
       );
       
       if (!mounted) return;
@@ -235,6 +237,9 @@ class _NutritionistScreenState extends State<NutritionistScreen> with SingleTick
       
       // Scroll to bottom
       _scrollToBottom();
+      
+      // Extract and save nutrition values from Padma's response
+      _extractAndSaveNutritionValues(response);
     } catch (e) {
       if (!mounted) return;
       
@@ -246,6 +251,83 @@ class _NutritionistScreenState extends State<NutritionistScreen> with SingleTick
         });
         _isTyping = false;
       });
+    }
+  }
+
+  // Extract and save nutrition values from Padma's response
+  Future<void> _extractAndSaveNutritionValues(String response) async {
+    try {
+      // Regular expressions to extract nutrition values - updated to match the specific format in the response
+      final caloriesRegex = RegExp(r'daily calorie recommendation:?\s*\*?\*?(\d+)\s*calories', caseSensitive: false);
+      final proteinRegex = RegExp(r'protein:?\s*\*?\*?(\d+)g', caseSensitive: false);
+      final carbsRegex = RegExp(r'carb(?:ohydrate)?s?:?\s*\*?\*?(\d+)g', caseSensitive: false);
+      final fatRegex = RegExp(r'fat:?\s*\*?\*?(\d+)g', caseSensitive: false);
+      
+      // Extract values - search in first 1000 characters to avoid meal-specific values
+      String topPortion = response.length > 1000 ? response.substring(0, 1000) : response;
+      
+      // print('Searching for nutrition values in: ${topPortion.substring(0, math.min(200, topPortion.length))}...');
+      
+      // Extract values
+      int? calories;
+      int? protein;
+      int? carbs;
+      int? fat;
+      
+      final caloriesMatch = caloriesRegex.firstMatch(topPortion);
+      if (caloriesMatch != null && caloriesMatch.groupCount >= 1) {
+        calories = int.tryParse(caloriesMatch.group(1)!);
+        print('Found calories: $calories');
+      }
+      
+      final proteinMatch = proteinRegex.firstMatch(topPortion);
+      if (proteinMatch != null && proteinMatch.groupCount >= 1) {
+        protein = int.tryParse(proteinMatch.group(1)!);
+        print('Found protein: $protein');
+      }
+      
+      final carbsMatch = carbsRegex.firstMatch(topPortion);
+      if (carbsMatch != null && carbsMatch.groupCount >= 1) {
+        carbs = int.tryParse(carbsMatch.group(1)!);
+        print('Found carbs: $carbs');
+      }
+      
+      final fatMatch = fatRegex.firstMatch(topPortion);
+      if (fatMatch != null && fatMatch.groupCount >= 1) {
+        fat = int.tryParse(fatMatch.group(1)!);
+        print('Found fat: $fat');
+      }
+      
+      // If we found at least one value, save to backend
+      if (calories != null || protein != null || carbs != null || fat != null) {
+        final Map<String, dynamic> nutritionValues = {};
+        
+        if (calories != null) nutritionValues['calories'] = calories;
+        if (protein != null) nutritionValues['protein'] = protein;
+        if (carbs != null) nutritionValues['carbohydrates'] = carbs;
+        if (fat != null) nutritionValues['fat'] = fat;
+        
+        print('Extracted nutrition values: $nutritionValues');
+        
+        // Only send to backend if we have at least one value
+        if (nutritionValues.isNotEmpty) {
+          final result = await _apiService.updateDailyGoals(nutritionValues);
+          
+          // Show success message if values were saved
+          if (result.isNotEmpty && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Nutrition goals updated with Padma\'s recommendations'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Error extracting nutrition values: $e');
+      // Don't show error to user since this is a background operation
     }
   }
 
@@ -332,6 +414,9 @@ class _NutritionistScreenState extends State<NutritionistScreen> with SingleTick
         _messages.add(aiResponse);
         _isTyping = false;
       });
+      
+      // Extract and save nutrition values from Padma's response
+      _extractAndSaveNutritionValues(response);
     } catch (e) {
       if (!mounted) return;
       
@@ -407,12 +492,44 @@ class _NutritionistScreenState extends State<NutritionistScreen> with SingleTick
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              message,
-              style: GoogleFonts.montserrat(
-                color: Colors.white,
-                fontSize: 15,
+            MarkdownBody(
+              data: message,
+              styleSheet: MarkdownStyleSheet(
+                p: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontSize: 15,
+                ),
+                strong: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+                em: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontStyle: FontStyle.italic,
+                ),
+                h1: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                h2: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                h3: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                listBullet: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontSize: 15,
+                ),
               ),
+              extensionSet: md.ExtensionSet.gitHubWeb,
             ),
             const SizedBox(height: 4),
             Text(

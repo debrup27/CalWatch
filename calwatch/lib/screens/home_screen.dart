@@ -438,8 +438,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
-              children: [
-                IconButton(
+          children: [
+            IconButton(
                   onPressed: () {
                     setState(() {
                       _selectedDate = _selectedDate.subtract(const Duration(days: 1));
@@ -468,8 +468,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   },
                   child: Row(
                     children: [
-                      Text(
-                        _formatDate(_selectedDate),
+            Text(
+              _formatDate(_selectedDate),
                         style: const TextStyle(fontSize: 18, color: Colors.white),
                       ),
                       const Icon(
@@ -496,9 +496,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   },
                   icon: const Icon(
                     Icons.arrow_forward_ios,
-                    color: Colors.white,
-                  ),
-                ),
+                color: Colors.white,
+              ),
+            ),
               ],
             ),
             Row(
@@ -507,7 +507,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 _buildStreakWidget(),
                 const SizedBox(width: 8),
                 // Refresh button
-                IconButton(
+            IconButton(
                   onPressed: () {
                     setState(() {
                       _fetchDailyData();
@@ -526,16 +526,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       body: _isLoading 
           ? const Center(child: CircularProgressIndicator(color: Colors.green))
           : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                     // Nutrient circles
                     _buildNutrientCircles(),
-                    
+              
                     const SizedBox(height: 20),
-                    
+              
                     // Motivational Quote from PADMA
                     if (_isOnStreak && _streakCount > 0)
                       Container(
@@ -624,7 +624,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     
                     // Water consumption
-                    WaterTrackerWidget(
+              WaterTrackerWidget(
                       date: _selectedDate,
                       waterAmount: _waterIntake,
                       onAddWater: () {
@@ -642,19 +642,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         // Refresh data after adding water
                         _fetchDailyData();
                       },
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Food entries
-                    _buildFoodEntries(),
-                    
-                    // Add padding at bottom for navigation bar
-                    const SizedBox(height: 20),
-                  ],
-                ),
               ),
-            ),
+              
+              const SizedBox(height: 24),
+              
+              // Food entries
+                    _buildFoodEntries(),
+              
+              // Add padding at bottom for navigation bar
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -863,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ],
     );
   }
-
+  
   Widget _buildFoodEntries() {
     List<Widget> widgets = [];
     

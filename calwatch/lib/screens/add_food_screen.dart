@@ -42,7 +42,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     'Snack',
     'Water'
   ];
-  
+
   // Editable nutrition values
   double? _editedCalories;
   double? _editedProtein;
@@ -71,7 +71,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final apiService = ApiService();
       final foods = await apiService.getFoodList(limit: 10);
@@ -201,8 +201,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             backgroundColor: Colors.red,
           ),
         );
-      }
     }
+  }
   }
   
   // Select food from search results
@@ -458,11 +458,11 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       body: _isLoading
         ? const Center(child: CircularProgressIndicator(color: Colors.green))
         : SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                   _buildFoodSearchForm(),
                   
                   if (_selectedFood != null) ...[
@@ -475,12 +475,12 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     _buildSearchResults(),
                   ],
                   
-                  const SizedBox(height: 20),
-                  _buildRecentFoodsList(),
-                ],
-              ),
-            ),
+              const SizedBox(height: 20),
+              _buildRecentFoodsList(),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -507,36 +507,36 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               borderRadius: BorderRadius.circular(15),
               border: Border.all(color: Colors.white.withOpacity(0.2)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
                   'Search Food',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
                 TextField(
                   controller: _searchController,
-                  style: GoogleFonts.poppins(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Food Name',
-                    labelStyle: GoogleFonts.poppins(color: Colors.grey[400]),
+                    style: GoogleFonts.poppins(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Food Name',
+                      labelStyle: GoogleFonts.poppins(color: Colors.grey[400]),
                     hintText: 'Search for a food item...',
-                    hintStyle: GoogleFonts.poppins(color: Colors.grey[600]),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Colors.green),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[800]!.withOpacity(0.5),
+                      hintStyle: GoogleFonts.poppins(color: Colors.grey[600]),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Colors.green),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[800]!.withOpacity(0.5),
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     suffixIcon: _isSearching 
                       ? const SizedBox(
@@ -559,7 +559,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                           )
                         : null,
                   ),
-                ),
+                  ),
                 
                 if (_selectedFood != null) ...[
                   const SizedBox(height: 20),
@@ -635,7 +635,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       ),
     );
   }
-  
+
   Widget _buildSelectedFoodDetails() {
     final nutrients = _selectedFood!['nutrients'];
     
@@ -837,9 +837,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           ),
           child: ListView.builder(
             shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
+          physics: const NeverScrollableScrollPhysics(),
             itemCount: _searchResults.length,
-            itemBuilder: (context, index) {
+          itemBuilder: (context, index) {
               final food = _searchResults[index];
               return ListTile(
                 title: Text(
@@ -870,8 +870,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.bold,
-          ),
-        ),
+                  ),
+                ),
         const SizedBox(height: 4),
         Text(
           'Type these in the search box above',
@@ -959,7 +959,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     );
                   },
                 ),
-              ),
+        ),
       ],
     );
   }

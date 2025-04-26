@@ -64,6 +64,9 @@ class GroqService {
           'Provide helpful, accurate information based on modern nutrition science. '
           'Be friendly and supportive. If you don\'t know something, admit it rather than making up information. '
           'Keep responses concise and focused on nutrition and health topics.'
+          'When recommending diet plans, ALWAYS include clear numeric values in this format: XXX calories, XX g protein, XX g carbohydrates, XX g fat. '
+          'Use bold text with ** for important values, like **2000 calories**. '
+          'Your recommendations will be used to update the user\'s nutrition targets in the app.'
     });
     
     // Add chat history for context

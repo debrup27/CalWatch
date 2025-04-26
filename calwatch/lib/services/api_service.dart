@@ -573,6 +573,47 @@ class ApiService {
     }
   }
   
+  // Update daily goals with nutrition values recommended by Padma
+  Future<Map<String, dynamic>> updateDailyGoals(Map<String, dynamic> nutritionValues) async {
+    try {
+      print('Updating daily goals with data: $nutritionValues');
+      final headers = await _buildHeaders();
+      print('Request headers: $headers');
+      
+      final requestBody = json.encode(nutritionValues);
+      print('Request body: $requestBody');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/dailyGoals'),
+        headers: headers,
+        body: requestBody,
+      );
+      
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+      
+      if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry with new token
+          final retryResponse = await http.post(
+            Uri.parse('$baseUrl/api/dailyGoals'),
+            headers: await _buildHeaders(),
+            body: requestBody,
+          );
+          return _handleResponse(retryResponse);
+        }
+      }
+      
+      return _handleResponse(response);
+    } catch (e) {
+      print('Error updating daily goals: $e');
+      // Return empty map instead of throwing to prevent UI crashes
+      return {};
+    }
+  }
+  
   // Create user details (first time)
   Future<Map<String, dynamic>> createUserDetails(Map<String, dynamic> details) async {
     try {

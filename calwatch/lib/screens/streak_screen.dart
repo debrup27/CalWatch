@@ -184,65 +184,65 @@ class _StreakScreenState extends State<StreakScreen> with SingleTickerProviderSt
                   children: [
                     // Main Streak Display
                     Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Animated nebula
-                              AnimatedBuilder(
-                                animation: _controller,
-                                builder: (context, child) {
-                                  return Container(
-                                    width: 200,
-                                    height: 200,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        for (var i = 0; i < _nebulaColors.length; i++)
-                                          BoxShadow(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Animated nebula
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Container(
+                      width: 200,
+                      height: 200,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          for (var i = 0; i < _nebulaColors.length; i++)
+                            BoxShadow(
                                             color: widget.isOnStreak 
                                                 ? _nebulaColors[i] 
                                                 : Colors.grey.withOpacity(0.3),
-                                            blurRadius: 30 + 20 * math.sin(_controller.value * 2 * math.pi + i),
-                                            spreadRadius: 5 + 3 * math.cos(_controller.value * 2 * math.pi + i),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                              // Fire icon
-                              Icon(
-                                Icons.local_fire_department,
-                                size: 100,
+                              blurRadius: 30 + 20 * math.sin(_controller.value * 2 * math.pi + i),
+                              spreadRadius: 5 + 3 * math.cos(_controller.value * 2 * math.pi + i),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                // Fire icon
+                Icon(
+                  Icons.local_fire_department,
+                  size: 100,
                                 color: widget.isOnStreak 
                                     ? streakColor 
                                     : Colors.grey,
-                              ),
-                            ],
-                          ),
+                ),
+              ],
+            ),
                           const SizedBox(height: 20),
-                          // Streak count display
-                          Text(
-                            '${widget.streakCount}',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 72,
-                              fontWeight: FontWeight.bold,
+            // Streak count display
+            Text(
+              '${widget.streakCount}',
+              style: GoogleFonts.montserrat(
+                fontSize: 72,
+                fontWeight: FontWeight.bold,
                               color: widget.isOnStreak 
                                   ? Colors.white
                                   : Colors.grey[400],
-                            ),
-                          ),
+              ),
+            ),
                           const SizedBox(height: 10),
-                          Text(
-                            'day streak',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 24,
-                              color: Colors.grey[400],
-                            ),
-                          ),
+            Text(
+              'day streak',
+              style: GoogleFonts.montserrat(
+                fontSize: 24,
+                color: Colors.grey[400],
+              ),
+            ),
                           
                           // Penalty notice
                           if (_isPenaltyActive) ...[
@@ -297,7 +297,7 @@ class _StreakScreenState extends State<StreakScreen> with SingleTickerProviderSt
                           
                           if (achievementMessage != null) ...[
                             const SizedBox(height: 20),
-                            Container(
+            Container(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               decoration: BoxDecoration(
                                 color: Colors.black.withOpacity(0.6),
@@ -314,14 +314,14 @@ class _StreakScreenState extends State<StreakScreen> with SingleTickerProviderSt
                                   ),
                                 ],
                               ),
-                              child: Text(
+              child: Text(
                                 achievementMessage,
                                 style: GoogleFonts.montserrat(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
-                                textAlign: TextAlign.center,
+                textAlign: TextAlign.center,
                               ),
                             ),
                           ],
@@ -435,8 +435,8 @@ class _StreakScreenState extends State<StreakScreen> with SingleTickerProviderSt
                                 )
                               : Text(
                                   _motivationalQuote,
-                                  style: GoogleFonts.montserrat(
-                                    fontSize: 16,
+                style: GoogleFonts.montserrat(
+                  fontSize: 16,
                                     fontStyle: FontStyle.italic,
                                     height: 1.4,
                                     color: Colors.white,
@@ -565,9 +565,9 @@ class _StreakScreenState extends State<StreakScreen> with SingleTickerProviderSt
                 style: GoogleFonts.montserrat(
                   fontSize: 12,
                   color: Colors.grey[400],
-                ),
               ),
-            ],
+            ),
+          ],
           ),
         ),
       ],

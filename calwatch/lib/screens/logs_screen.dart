@@ -356,7 +356,7 @@ class _LogsScreenState extends State<LogsScreen> {
               },
               onPageChanged: (focusedDay) {
                 setState(() {
-                  _focusedDay = focusedDay;
+                _focusedDay = focusedDay;
                 });
                 
                 // Fetch logs with new date range
