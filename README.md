@@ -94,38 +94,38 @@ Team Members:
 ### Local Setup:
 
 #### Clone the repo
-git clone https://github.com/debrup27/CalWatch.git
+```git clone https://github.com/debrup27/CalWatch.git```
 
 #### Backend Setup:
 
 ##### Navigate to backend
-cd CalWatch/backend
+```cd CalWatch/backend```
 
 ##### Set up virtual environment
-py -m venv venv
-venv\Scripts\activate
+```py -m venv venv```
+```venv\Scripts\activate```
 
 ##### Install dependencies
-pip install -r requirements.txt
+```pip install -r requirements.txt```
 
 ##### Run server
-py manage.py runserver 0.0.0.0:8000
+```py manage.py runserver 0.0.0.0:8000```
 
 
 #### Frontend Setup:
 
 ##### Navigate to frontend project
-cd CalWatch/calwatch
+```cd CalWatch/calwatch```
 
 ##### .env Setup:
-GROQ_API_KEY='your-api-key'  # Get it from Groq Cloud
-BASE_URL='your-ip-address'   # Your public/local IP address
+```GROQ_API_KEY='your-api-key'  # Get it from Groq Cloud```
+```BASE_URL='your-ip-address'   # Your public/local IP address```
 
 ##### Install Flutter packages
-flutter pub get
+```flutter pub get```
 
 ##### Run the app
-flutter run
+```flutter run```
 
 
 ---
