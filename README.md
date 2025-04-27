@@ -154,6 +154,7 @@ Team Members:
 
 Building CalWatch was an incredible journey filled with both technical and creative challenges. From integrating Indian-specific food data to using Monad for logging streak transactions, deploying our own Stellar token, and seamlessly connecting all components, every step was a valuable learning experience.
 Huge thanks to our team, mentors, and the open-source community for their support! 🚀✨
+
 And last but not the least, thank you to the NAMESPACE Community for organizing HackHazards'25
 
 
