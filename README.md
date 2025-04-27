@@ -76,24 +76,12 @@ Team Members:
 
 
 
-
-
-
-https://postimg.cc/bsy1s2LD
-
-https://postimg.cc/t7H3Gcxz
-
-https://postimg.cc/bsmkbNF6
-
-https://postimg.cc/XrXFgSRn
-
-https://postimg.cc/RqQcST1x
-
-https://postimg.cc/tsf6SvbW 
+<img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_190314%20-%20Copy.jpg" width="300"> <img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_190328%20-%20Copy.jpg" width="300"> <img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_190336%20-%20Copy.jpg" width="300"> 
+<img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_190409%20-%20Copy.jpg" width="300"> <img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_221500%20-%20Copy.jpg" width="300">
 
 
 
 ### 📽️ Demo & Deliverables
-[![YOUTUBE VIDEO](https://img.shields.io/badge/my_portfolio-000?style=for-the-badge&logo=ko-fi&logoColor=white)](https://www.youtube.com/watch?v=xp-ORfczERo)
+![Demo Video](https://www.youtube.com/watch?v=xp-ORfczERo)
 
 
