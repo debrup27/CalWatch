@@ -132,9 +132,9 @@ Team Members:
 ---
 
 ## 🧬 Future Scope
-
+- 👜 Integrate a third party wallet so that the user does not have to enter their private key and their public key can be used
 - 📈 Expand to integrate wearable devices (smartwatches, fitness bands)  
-- 🛡️ Implement multi-layer security for blockchain transactions  
+- 🛡️ Implement multi-layer security for blockchain transactions
 - 🌐 Add localization for Indian regional languages to reach a wider audience  
 - 🤖 Further personalize AI coaching with user emotion tracking  
 
