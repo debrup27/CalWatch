@@ -114,7 +114,7 @@ Team Members:
 
 #### Frontend Setup:
 
-##### Navigate to frontend project
+##### Navigate to frontend part of the project
 ```cd CalWatch/calwatch```
 
 ##### .env Setup:
@@ -145,15 +145,16 @@ Team Members:
 - **Groq AI** – Ultra-fast real-time AI engine powering Padma, our nutrition coach  
 - **Monad Blockchain** – Secure and fast blockchain for streak tracking  
 - **Stellar Network** – Fast, low-cost blockchain for token rewards  
-- **Indian Food Composition Tables (IFCT)** – Dataset for Indian nutritional data  
+- **Indian Food Composition Tables (IFCT) and other Open Source Resources** – Dataset for Indian nutritional data  
 - **Open Source Libraries** – Flutter packages, Django Rest Framework  
 
 ---
 
 ## 🏁 Final Words
 
-Building CalWatch was an incredible journey filled with technical and creative challenges. From integrating Indian-specific food data to deploying our own Stellar token and connecting everything seamlessly, every step was a learning experience.  
+Building CalWatch was an incredible journey filled with both technical and creative challenges. From integrating Indian-specific food data to using Monad for logging streak transactions, deploying our own Stellar token, and seamlessly connecting all components, every step was a valuable learning experience.
 Huge thanks to our team, mentors, and the open-source community for their support! 🚀✨
+And last but not the least, thank you to the NAMESPACE Community for organizing HackHazards'25
 
 
 
