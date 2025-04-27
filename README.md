@@ -93,8 +93,8 @@ Team Members:
 
 ### Local Setup:
 
-bash
 # Clone the repo
+bash
 git clone https://github.com/debrup27/CalWatch.git
 
 #### Backend Setup:
@@ -114,8 +114,9 @@ py manage.py runserver 0.0.0.0:8000
 
 
 #### Frontend Setup:
-bash
+
 # Navigate to frontend project
+bash
 cd CalWatch/calwatch
 
 #### .env Setup:
