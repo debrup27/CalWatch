@@ -119,6 +119,7 @@ Team Members:
 
 ##### .env Setup:
 ```GROQ_API_KEY='your-api-key'  # Get it from Groq Cloud```
+
 ```BASE_URL='your-ip-address'   # Your public/local IP address```
 
 ##### Install Flutter packages
