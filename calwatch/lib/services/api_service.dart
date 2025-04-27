@@ -81,26 +81,141 @@ class ApiService {
     return headers;
   }
   
-  // Handle response and errors
+  // Handle API response
   dynamic _handleResponse(http.Response response) {
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      // Success response
+    final int statusCode = response.statusCode;
+    
+    if (statusCode >= 200 && statusCode < 300) {
       if (response.body.isNotEmpty) {
-        return json.decode(response.body);
+        final dynamic responseData = json.decode(response.body);
+        
+        // Convert timestamps from GMT to local time
+        if (responseData is Map<String, dynamic>) {
+          return _convertTimestampsToLocal(responseData);
+        } else if (responseData is List) {
+          return responseData.map((item) {
+            if (item is Map<String, dynamic>) {
+              return _convertTimestampsToLocal(item);
+            }
+            return item;
+          }).toList();
+        }
+        
+        return responseData;
       }
       return null;
+    } else if (statusCode == 401) {
+      // Token expired or unauthorized
+      throw Exception('Unauthorized: ${response.body}');
     } else {
-      // Error handling
-      try {
-        final error = json.decode(response.body);
-        final errorMessage = error is Map ? 
-          (error['detail'] ?? error['message'] ?? 'An error occurred') : 
-          'An error occurred';
-        throw Exception(errorMessage);
-      } catch (e) {
-        throw Exception('An error occurred: ${response.statusCode}');
+      throw Exception('API Error: Status $statusCode - ${response.body}');
+    }
+  }
+  
+  // Convert timestamps in response from GMT to local time
+  Map<String, dynamic> _convertTimestampsToLocal(Map<String, dynamic> data) {
+    final result = Map<String, dynamic>.from(data);
+    
+    // List of common timestamp field names
+    final timestampFields = [
+      'timestamp', 'created_at', 'updated_at', 'date', 
+      'start_time', 'end_time', 'log_date', 'entry_date'
+    ];
+    
+    // Process top-level timestamp fields
+    for (final field in timestampFields) {
+      if (result.containsKey(field) && result[field] != null) {
+        final value = result[field];
+        if (value is String) {
+          try {
+            final gmtTime = DateTime.parse(value);
+            final localTime = gmtTime.toLocal();
+            result[field] = localTime.toIso8601String();
+          } catch (e) {
+            print('Error parsing timestamp for field $field: $e');
+          }
+        }
       }
     }
+    
+    // Process nested objects
+    _processNestedObjectsToLocal(result);
+    
+    return result;
+  }
+  
+  // Process nested objects for GMT to local time conversion
+  void _processNestedObjectsToLocal(Map<String, dynamic> data) {
+    data.forEach((key, value) {
+      if (value is Map<String, dynamic>) {
+        data[key] = _convertTimestampsToLocal(value);
+      } else if (value is List) {
+        data[key] = _processTimestampsToLocal(value);
+      }
+    });
+  }
+  
+  // Process timestamps in lists for GMT to local time conversion
+  List _processTimestampsToLocal(List items) {
+    return items.map((item) {
+      if (item is Map<String, dynamic>) {
+        return _convertTimestampsToLocal(item);
+      }
+      return item;
+    }).toList();
+  }
+  
+  // Convert timestamps in request to GMT
+  Map<String, dynamic> _convertTimestampsToGMT(Map<String, dynamic> data) {
+    final result = Map<String, dynamic>.from(data);
+    
+    // List of common timestamp field names
+    final timestampFields = [
+      'timestamp', 'created_at', 'updated_at', 'date', 
+      'start_time', 'end_time', 'log_date', 'entry_date'
+    ];
+    
+    // Process top-level timestamp fields
+    for (final field in timestampFields) {
+      if (result.containsKey(field) && result[field] != null) {
+        final value = result[field];
+        if (value is String) {
+          try {
+            final localTime = DateTime.parse(value);
+            final gmtTime = localTime.toUtc();
+            result[field] = gmtTime.toIso8601String();
+          } catch (e) {
+            print('Error parsing timestamp for field $field: $e');
+          }
+        }
+      }
+    }
+    
+    // Process nested objects
+    _processNestedObjectsToGMT(result);
+    
+    return result;
+  }
+  
+  // Process nested objects for local time to GMT conversion
+  void _processNestedObjectsToGMT(Map<String, dynamic> data) {
+    data.forEach((key, value) {
+      if (value is Map<String, dynamic>) {
+        data[key] = _convertTimestampsToGMT(value);
+      } else if (value is List) {
+        data[key] = _processTimestampsToGMT(value);
+      }
+    });
+  }
+  
+  // Process timestamps in lists for local time to GMT conversion
+  List _processTimestampsToGMT(List items) {
+    return items.map((item) {
+      if (item is Map<String, dynamic>) {
+        return _convertTimestampsToGMT(item);
+      }
+      return item;
+    }).toList();
   }
   
   // Refresh access token using refresh token
@@ -285,10 +400,13 @@ class ApiService {
   // Add food entry
   Future<Map<String, dynamic>> addFoodEntry(Map<String, dynamic> foodData) async {
     try {
+      // Convert timestamps to GMT
+      final gmtFoodData = _convertTimestampsToGMT(foodData);
+      
       final response = await http.post(
         Uri.parse('$baseUrl$foodEntriesEndpoint'),
         headers: await _buildHeaders(),
-        body: json.encode(foodData),
+        body: json.encode(gmtFoodData),
       );
       
       if (response.statusCode == 401) {
@@ -299,7 +417,7 @@ class ApiService {
           final retryResponse = await http.post(
             Uri.parse('$baseUrl$foodEntriesEndpoint'),
             headers: await _buildHeaders(),
-            body: json.encode(foodData),
+            body: json.encode(gmtFoodData),
           );
           return _handleResponse(retryResponse);
         }
@@ -428,10 +546,13 @@ class ApiService {
   // Add log entry (weight, water, exercise)
   Future<Map<String, dynamic>> addLogEntry(Map<String, dynamic> logData) async {
     try {
+      // Convert timestamps to GMT
+      final gmtLogData = _convertTimestampsToGMT(logData);
+      
       final response = await http.post(
         Uri.parse('$baseUrl$logsEndpoint'),
         headers: await _buildHeaders(),
-        body: json.encode(logData),
+        body: json.encode(gmtLogData),
       );
       
       if (response.statusCode == 401) {
@@ -442,7 +563,7 @@ class ApiService {
           final retryResponse = await http.post(
             Uri.parse('$baseUrl$logsEndpoint'),
             headers: await _buildHeaders(),
-            body: json.encode(logData),
+            body: json.encode(gmtLogData),
           );
           return _handleResponse(retryResponse);
         }
@@ -580,7 +701,10 @@ class ApiService {
       final headers = await _buildHeaders();
       print('Request headers: $headers');
       
-      final requestBody = json.encode(nutritionValues);
+      // Convert timestamps to GMT
+      final gmtNutritionValues = _convertTimestampsToGMT(nutritionValues);
+      
+      final requestBody = json.encode(gmtNutritionValues);
       print('Request body: $requestBody');
       
       final response = await http.post(
@@ -621,7 +745,10 @@ class ApiService {
       final headers = await _buildHeaders();
       print('Request headers: $headers');
       
-      final requestBody = json.encode(details);
+      // Convert timestamps to GMT
+      final gmtDetails = _convertTimestampsToGMT(details);
+      
+      final requestBody = json.encode(gmtDetails);
       print('Request body: $requestBody');
       
       final response = await http.post(
@@ -641,7 +768,7 @@ class ApiService {
           final retryResponse = await http.post(
             Uri.parse('$baseUrl$userDetailsEndpoint'),
             headers: await _buildHeaders(),
-            body: json.encode(details),
+            body: json.encode(gmtDetails),
           );
           return _handleResponse(retryResponse);
         }
@@ -657,10 +784,13 @@ class ApiService {
   // Update existing user details (from profile)
   Future<Map<String, dynamic>> updateUserDetails(Map<String, dynamic> details) async {
     try {
+      // Convert timestamps to GMT
+      final gmtDetails = _convertTimestampsToGMT(details);
+      
       final response = await http.patch(
         Uri.parse('$baseUrl$userDetailsEndpoint'),
         headers: await _buildHeaders(),
-        body: json.encode(details),
+        body: json.encode(gmtDetails),
       );
       
       if (response.statusCode == 401) {
@@ -671,7 +801,7 @@ class ApiService {
           final retryResponse = await http.patch(
             Uri.parse('$baseUrl$userDetailsEndpoint'),
             headers: await _buildHeaders(),
-            body: json.encode(details),
+            body: json.encode(gmtDetails),
           );
           return _handleResponse(retryResponse);
         }
@@ -687,12 +817,15 @@ class ApiService {
   // Update user profile (bio, profile image)
   Future<Map<String, dynamic>> updateUserProfileBio(Map<String, dynamic> profileData) async {
     try {
+      // Convert timestamps to GMT
+      final gmtProfileData = _convertTimestampsToGMT(profileData);
+      
       // For profile image uploads, we would need to use multipart/form-data
       // This simplified version handles text-only updates
       final response = await http.patch(
         Uri.parse('$baseUrl$userProfileUpdateEndpoint'),
         headers: await _buildHeaders(),
-        body: json.encode(profileData),
+        body: json.encode(gmtProfileData),
       );
       
       if (response.statusCode == 401) {
@@ -703,7 +836,7 @@ class ApiService {
           final retryResponse = await http.patch(
             Uri.parse('$baseUrl$userProfileUpdateEndpoint'),
             headers: await _buildHeaders(),
-            body: json.encode(profileData),
+            body: json.encode(gmtProfileData),
           );
           return _handleResponse(retryResponse);
         }
@@ -886,12 +1019,15 @@ class ApiService {
       if (carbohydrates != null) requestBody['carbohydrates'] = carbohydrates;
       if (fat != null) requestBody['fat'] = fat;
       
-      print('Adding food with request body: $requestBody');
+      // Convert timestamps to GMT
+      final gmtRequestBody = _convertTimestampsToGMT(requestBody);
+      
+      print('Adding food with request body: $gmtRequestBody');
       
       final response = await http.post(
         Uri.parse('$baseUrl$addFoodEndpoint'),
         headers: await _buildHeaders(),
-        body: json.encode(requestBody),
+        body: json.encode(gmtRequestBody),
       );
       
       if (response.statusCode == 401) {
@@ -902,7 +1038,7 @@ class ApiService {
           final retryResponse = await http.post(
             Uri.parse('$baseUrl$addFoodEndpoint'),
             headers: await _buildHeaders(),
-            body: json.encode(requestBody),
+            body: json.encode(gmtRequestBody),
           );
           return _handleResponse(retryResponse);
         }
@@ -990,12 +1126,14 @@ class ApiService {
   // Add water intake
   Future<Map<String, dynamic>> addWaterIntake(double amount) async {
     try {
+      // Convert potential timestamp data to GMT
+      final Map<String, dynamic> waterData = {'amount': amount};
+      final gmtWaterData = _convertTimestampsToGMT(waterData);
+      
       final response = await http.post(
         Uri.parse('$baseUrl$waterIntakeEndpoint'),
         headers: await _buildHeaders(),
-        body: json.encode({
-          'amount': amount,
-        }),
+        body: json.encode(gmtWaterData),
       );
       
       if (response.statusCode == 401) {
@@ -1006,9 +1144,7 @@ class ApiService {
           final retryResponse = await http.post(
             Uri.parse('$baseUrl$waterIntakeEndpoint'),
             headers: await _buildHeaders(),
-            body: json.encode({
-              'amount': amount,
-            }),
+            body: json.encode(gmtWaterData),
           );
           return _handleResponse(retryResponse);
         }

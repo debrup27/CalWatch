@@ -80,7 +80,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       setState(() {
         _recentFoods = foods;
         _isLoading = false;
-      });
+    });
     } catch (e) {
       print('Error loading recent foods: $e');
       setState(() {
@@ -597,7 +597,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             Icons.restaurant_menu,
             color: Colors.green,
             size: 50,
-          ),
+            ),
           const SizedBox(height: 20),
           Text(
             "Your Nutrition Journey Awaits",
@@ -617,7 +617,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               fontSize: 16,
               height: 1.4,
             ),
-          ),
+        ),
         ],
       ),
     );
@@ -782,7 +782,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                   ),
                 ],
               ],
-            ),
+              ),
           ),
         ),
       ),
@@ -1091,16 +1091,16 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       border: Border.all(
                         color: Colors.purpleAccent.withOpacity(0.3),
                         width: 1,
-                      ),
-                    ),
+                  ),
+                ),
                     child: Center(
                       child: Text(
                         'No common foods available',
                   style: GoogleFonts.poppins(
                     color: Colors.grey[400],
                           fontSize: 14,
-                        ),
-                      ),
+                  ),
+                ),
                     ),
                   ),
                 ),
@@ -1207,7 +1207,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                                       Icons.add_circle,
                                       color: Colors.white,
                                       size: 18,
-                                    ),
+                      ),
                                   ],
                                 ),
                               ),

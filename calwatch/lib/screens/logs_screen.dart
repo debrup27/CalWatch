@@ -91,7 +91,6 @@ class _LogsScreenState extends State<LogsScreen> {
         break;
         
       case CalendarFormat.week:
-      default:
         // For week view, get start and end of the week
         int difference = _focusedDay.weekday - 1; // 0 for Monday, 6 for Sunday
         start = _focusedDay.subtract(Duration(days: difference));

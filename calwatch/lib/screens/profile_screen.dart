@@ -1202,7 +1202,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 12),
           
           _buildAccountInfoItem(Icons.info_outline, 'Version', '1.0.0'),
-          _buildAccountInfoItem(Icons.code, 'Build', '2025.04.26'),
         ],
       ),
     );
