@@ -53,7 +53,7 @@ Team Members:
 
 - ✅ *Monad Blockchain for Progress Tracking*: CalWatch uses Monad to securely track user streaks and milestones, providing a transparent, tamper-proof history of fitness progress and giving users true ownership of their achievements.
 
-- ✅ *Stellar Token Rewards*: The app leverages the Stellar network to manage fitness reward tokens, ensuring fast, low-cost, and secure transactions, allowing users to earn and manage rewards fairly, with no high gas fees.
+- ✅ *Stellar Token Rewards*: The app leverages the Stellar network to manage fitness reward tokens, ensuring fast, low-cost, and secure transactions, allowing users to earn and manage rewards fairly, with low gas fees.
 
 - ✅ *Personalized and Adaptive*: CalWatch adapts to each user's unique fitness journey, offering tailored advice and adjustments based on their habits, goals, and challenges, ensuring that support is always relevant.
 
@@ -68,8 +68,8 @@ Team Members:
 
 ## 📽️ Demo & Deliverables
 
-- *Demo Video Link:* [https://www.youtube.com/watch?v=xp-ORfczERo]  
-- *Pitch Deck / PPT Link:* [https://drive.google.com/file/d/1qthyBKtct76HJgbZEryDbZbUJinjXVwC/view?usp=drive_link]  
+- *Demo Video Link:* https://www.youtube.com/watch?v=xp-ORfczERo  
+- *Pitch Deck / PPT Link:* https://drive.google.com/file/d/1qthyBKtct76HJgbZEryDbZbUJinjXVwC/view?usp=drive_link  
 
 ---
 
