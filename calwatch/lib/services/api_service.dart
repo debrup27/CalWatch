@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
 class ApiService {
   // Base URL for API
-  static const String baseUrl = 'http://192.168.0.174:8000';
+  static String baseUrl = dotenv.env["BASE_URL"] ?? "";
   
   // Djoser Authentication Endpoints
   static const String registerEndpoint = '/auth/users/';
