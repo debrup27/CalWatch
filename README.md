@@ -40,7 +40,7 @@ Team Members:
 - Backend : Django, Django REST Framework, Djoser, SQLite
 - APIs : Groq
 
-### Sponsor Technologies Used (if any):
+### Sponsor Technologies Used:
 ✅ **Groq:** CalWatch leverages Groq's ultra-fast AI to power Padma, a personalized nutrition assistant that offers real-time, empathetic advice, making the app feel like having a supportive coach by your side 24/7. 
 
 ✅ **Monad:** CalWatch uses the Monad blockchain to securely track user streaks and milestones, creating a transparent, tamper-proof record of progress, giving users true ownership of their fitness achievements.
