@@ -1,12 +1,3 @@
-
-# 🚀 Project Title
-
-CalWatch is your AI-powered fitness companion. Padma, driven by GROQ, tracks your calories and rewards your daily logs with Streak tokens via Monad Transactions on the Stellar blockchain.
-
-## 📌 Problem Statement
-
-Problem Statement 1: Weave AI magic with Groq
-
 # 🚀 Project Title
 
 CalWatch is your AI-powered fitness companion. Padma, driven by GROQ, tracks your calories and rewards your daily logs with Streak tokens via Monad Transactions on the Stellar blockchain.
