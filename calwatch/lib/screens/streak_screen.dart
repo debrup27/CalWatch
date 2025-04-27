@@ -482,7 +482,7 @@ class _StreakScreenState extends State<StreakScreen> with SingleTickerProviderSt
                           _buildInfoRow(
                             Icons.emoji_events_outlined,
                             'Achievements',
-                            'Unlock achievements at 3, 7, 14, 21, 30, 60, 90, 180, and 365 days.',
+                            'Unlock achievements at 3, 7, 10, 15, 21, 25, 30, 60, 90, 180, and 365 days.',
                           ),
                           const SizedBox(height: 12),
                           _buildInfoRow(
@@ -506,13 +506,109 @@ class _StreakScreenState extends State<StreakScreen> with SingleTickerProviderSt
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Recent History',
-                          style: GoogleFonts.montserrat(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Recent History',
+                              style: GoogleFonts.montserrat(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () async {
+                                // Show confirmation dialog
+                                final shouldClear = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    backgroundColor: Colors.grey[900],
+                                    title: Text(
+                                      'Clear History',
+                                      style: GoogleFonts.montserrat(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    content: Text(
+                                      'Are you sure you want to clear your streak history? This action cannot be undone.',
+                                      style: GoogleFonts.montserrat(
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(false),
+                                        child: Text(
+                                          'Cancel',
+                                          style: GoogleFonts.montserrat(
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(true),
+                                        child: Text(
+                                          'Clear',
+                                          style: GoogleFonts.montserrat(
+                                            color: Colors.red[300],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ) ?? false;
+                                
+                                if (shouldClear) {
+                                  try {
+                                    await _streakService.clearStreakHistory();
+                                    setState(() {
+                                      _streakHistory = [];
+                                    });
+                                    
+                                    // Show success message
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Streak history cleared successfully'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    // Show error message
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Error clearing history: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.grey,
+                                size: 18,
+                              ),
+                              label: Text(
+                                'Clear',
+                                style: GoogleFonts.montserrat(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         _streakHistory.isEmpty

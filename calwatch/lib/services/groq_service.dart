@@ -67,6 +67,12 @@ class GroqService {
           'When recommending diet plans, ALWAYS include clear numeric values in this format: XXX calories, XX g protein, XX g carbohydrates, XX g fat. '
           'Use bold text with ** for important values, like **2000 calories**. '
           'Your recommendations will be used to update the user\'s nutrition targets in the app.'
+          'ALWAYS include nutrition values in this exact format at the beginning of your message: '
+          '**Calories: 2000 calories**'
+          '**Protein: 70g**'
+          '**Carbohydrates: 250g**'
+          '**Fat: 65g**'
+          'Always provide specific single values, not ranges. Approximations are okay, but always give one specific number.'
     });
     
     // Add chat history for context

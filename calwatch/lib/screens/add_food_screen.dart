@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
 import 'dart:async';
 import '../services/api_service.dart';
+import 'dart:math' as math;
 
 class AddFoodScreen extends StatefulWidget {
   const AddFoodScreen({Key? key}) : super(key: key);
@@ -208,19 +209,23 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   // Select food from search results
   void _selectFood(Map<String, dynamic> food) {
     // Store the ID or index if available
-    if (food.containsKey('food_id')) {
+    print('Selected food: $food');
+    if (food.containsKey('food_id') && food['food_id'] != null && (food['food_id'].toString().contains("ASC") || food['food_id'].toString().contains("BFP") || food['food_id'].toString().contains("OSR"))) {
       _selectedFoodId = food['food_id'].toString();
       _selectedFoodIndex = null;
-    } else if (food.containsKey('id')) {
+    } else if (food.containsKey('id') && food['id'] != null && (food['id'].toString().contains("ASC") || food['id'].toString().contains("BFP") || food['id'].toString().contains("OSR"))) {
       _selectedFoodId = food['id'].toString();
       _selectedFoodIndex = null;
-    } else if (food.containsKey('food_index')) {
+    } else if (food.containsKey('food_index') && food['food_index'] != null) {
       _selectedFoodId = null;
       _selectedFoodIndex = food['food_index'] as int;
-    } else if (food.containsKey('index')) {
+    } else if (food.containsKey('index') && food['index'] != null) {
       _selectedFoodId = null;
       _selectedFoodIndex = food['index'] as int;
     }
+
+    print('Selected food ID: $_selectedFoodId');
+    print('Selected food Index: $_selectedFoodIndex');
     
     // Get the details
     if (_selectedFoodId != null) {
@@ -455,39 +460,173 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           ),
         ),
       ),
-      body: _isLoading
-        ? const Center(child: CircularProgressIndicator(color: Colors.green))
-        : SingleChildScrollView(
+      body: Stack(
+        children: [
+          // Nebula effect background
+          ..._buildNebulaBackground(),
+          
+          // Main content
+          _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Colors.green))
+            : SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                  _buildFoodSearchForm(),
-                  
-                  if (_selectedFood != null) ...[
-                    const SizedBox(height: 20),
-                    _buildSelectedFoodDetails(),
-                  ],
-                  
-                  if (_searchResults.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    _buildSearchResults(),
-                  ],
-                  
+                    _buildFoodSearchForm(),
+                    
+                    if (_selectedFood != null) ...[
+                      const SizedBox(height: 20),
+                      _buildSelectedFoodDetails(),
+                    ],
+                    
+                    if (_searchResults.isNotEmpty && _selectedFood == null) ...[
+                      const SizedBox(height: 20),
+                      _buildSearchResults(),
+                    ],
+                    
               const SizedBox(height: 20),
               _buildRecentFoodsList(),
+                    
+                    // Add motivational message if no food selected and no search results
+                    if (_selectedFood == null && _searchResults.isEmpty)
+                      _buildMotivationalMessage(),
             ],
           ),
         ),
+      ),
+        ],
+      ),
+    );
+  }
+
+  // Create nebula background
+  List<Widget> _buildNebulaBackground() {
+    final Size size = MediaQuery.of(context).size;
+    final List<Widget> nebulaElements = [];
+    
+    // Background color
+    nebulaElements.add(
+      Container(
+        width: size.width,
+        height: size.height,
+        color: Colors.black,
+      ),
+    );
+    
+    // Nebula clouds
+    for (int i = 0; i < 15; i++) {
+      final random = math.Random(i);
+      final xCenter = random.nextDouble() * size.width;
+      final yCenter = random.nextDouble() * size.height;
+      final radius = size.width * (0.1 + 0.15 * random.nextDouble());
+      
+      // Use multiple overlapping gradients for a richer effect
+      final hue = (220 + 80 * random.nextDouble()) % 360;
+      
+      nebulaElements.add(
+        Positioned(
+          left: xCenter - radius,
+          top: yCenter - radius,
+          child: Container(
+            width: radius * 2,
+            height: radius * 2,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  HSLColor.fromAHSL(0.3, hue, 0.8, 0.5).toColor(),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 1.0],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Stars
+    for (int i = 0; i < 100; i++) {
+      final random = math.Random(i + 20);
+      final size = random.nextDouble() * 2;
+      
+      nebulaElements.add(
+        Positioned(
+          left: random.nextDouble() * MediaQuery.of(context).size.width,
+          top: random.nextDouble() * MediaQuery.of(context).size.height,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(random.nextDouble() * 0.5 + 0.5),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return nebulaElements;
+  }
+  
+  // Build motivational message
+  Widget _buildMotivationalMessage() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 40),
+      padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.purpleAccent.withOpacity(0.3),
+          width: 1,
+        ),
+          boxShadow: [
+            BoxShadow(
+            color: Colors.purpleAccent.withOpacity(0.1),
+            blurRadius: 10,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.restaurant_menu,
+            color: Colors.green,
+            size: 50,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            "Your Nutrition Journey Awaits",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.montserrat(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Search for foods to add to your daily log and track your progress toward a healthier you.",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.montserrat(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 16,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildFoodSearchForm() {
     return Card(
-      color: Colors.grey[900],
-      elevation: 4,
+      color: Colors.transparent,
+      elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(15),
@@ -500,12 +639,19 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.grey.withOpacity(0.2),
-                  Colors.grey.shade900.withOpacity(0.8),
+                  Colors.purpleAccent.withOpacity(0.1),
+                  Colors.grey.shade900.withOpacity(0.7),
                 ],
               ),
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.purpleAccent.withOpacity(0.3), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.purpleAccent.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -529,14 +675,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       hintStyle: GoogleFonts.poppins(color: Colors.grey[600]),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.grey[700]!),
+                        borderSide: BorderSide(color: Colors.purpleAccent.withOpacity(0.3)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(color: Colors.green),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[800]!.withOpacity(0.5),
+                      fillColor: Colors.black.withOpacity(0.5),
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     suffixIcon: _isSearching 
                       ? const SizedBox(
@@ -591,7 +737,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                             ),
                             selected: isSelected,
                             selectedColor: Colors.green,
-                            backgroundColor: Colors.grey[800],
+                            backgroundColor: Colors.black.withOpacity(0.3),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              side: BorderSide(
+                                color: isSelected ? Colors.green : Colors.purpleAccent.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
                             onSelected: (selected) {
                               if (selected) {
                                 setState(() {
@@ -640,125 +793,151 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     final nutrients = _selectedFood!['nutrients'];
     
     return Card(
-      color: Colors.grey[900],
-      elevation: 4,
+      color: Colors.transparent,
+      elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Food Details',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () {
-                    setState(() {
-                      _selectedFood = null;
-                      _searchController.text = '';
-                      // Reset edited values
-                      _editedCalories = null;
-                      _editedProtein = null;
-                      _editedCarbs = null;
-                      _editedFat = null;
-                    });
-                  },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.purpleAccent.withOpacity(0.1),
+                  Colors.grey.shade900.withOpacity(0.7),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.purpleAccent.withOpacity(0.3), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.purpleAccent.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 1,
                 ),
               ],
             ),
-            
-            const Divider(color: Colors.grey),
-            
-            Text(
-              _selectedFood!['food_name'] ?? 'Unknown Food',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Nutrition info
-            if (nutrients != null) ...[
-              _buildNutrientRow(
-                'Calories', 
-                _editedCalories != null 
-                  ? '${_editedCalories!} kcal (edited)'
-                  : '${_parseNutrientValue(nutrients['calories'])} kcal', 
-                Colors.orange,
-                () => _onEditNutrient(
-                  'Calories',
-                  _editedCalories ?? _parseNutrientValue(nutrients['calories']),
-                  (value) => setState(() => _editedCalories = value)
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Food Details',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () {
+                        setState(() {
+                          _selectedFood = null;
+                          _searchController.text = '';
+                          _searchResults = []; // Clear search results immediately
+                          // Reset edited values
+                          _editedCalories = null;
+                          _editedProtein = null;
+                          _editedCarbs = null;
+                          _editedFat = null;
+                        });
+                      },
+                    ),
+                  ],
                 ),
-                isEdited: _editedCalories != null
-              ),
-              const SizedBox(height: 10),
-              _buildNutrientRow(
-                'Protein', 
-                _editedProtein != null 
-                  ? '${_editedProtein!} g (edited)' 
-                  : '${_parseNutrientValue(nutrients['protein'])} g', 
-                Colors.red,
-                () => _onEditNutrient(
-                  'Protein',
-                  _editedProtein ?? _parseNutrientValue(nutrients['protein']),
-                  (value) => setState(() => _editedProtein = value)
-                ),
-                isEdited: _editedProtein != null
-              ),
-              const SizedBox(height: 10),
-              _buildNutrientRow(
-                'Carbs', 
-                _editedCarbs != null 
-                  ? '${_editedCarbs!} g (edited)' 
-                  : '${_parseNutrientValue(nutrients['carbs'])} g', 
-                Colors.blue,
-                () => _onEditNutrient(
-                  'Carbs',
-                  _editedCarbs ?? _parseNutrientValue(nutrients['carbs']),
-                  (value) => setState(() => _editedCarbs = value)
-                ),
-                isEdited: _editedCarbs != null
-              ),
-              const SizedBox(height: 10),
-              _buildNutrientRow(
-                'Fat', 
-                _editedFat != null 
-                  ? '${_editedFat!} g (edited)' 
-                  : '${_parseNutrientValue(nutrients['fat'])} g', 
-                Colors.yellow,
-                () => _onEditNutrient(
-                  'Fat',
-                  _editedFat ?? _parseNutrientValue(nutrients['fat']),
-                  (value) => setState(() => _editedFat = value)
-                ),
-                isEdited: _editedFat != null
-              ),
-              const SizedBox(height: 20),
-              Center(
-                child: Text(
-                  'Tap the edit buttons to customize nutrition values',
+                
+                Divider(color: Colors.purpleAccent.withOpacity(0.3)),
+                
+                Text(
+                  _selectedFood!['food_name'] ?? 'Unknown Food',
                   style: GoogleFonts.poppins(
-                    color: Colors.grey[500],
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-            ],
-          ],
+                
+                const SizedBox(height: 20),
+                
+                // Nutrition info
+                if (nutrients != null) ...[
+                  _buildNutrientRow(
+                    'Calories', 
+                    _editedCalories != null 
+                      ? '${_editedCalories!} kcal (edited)'
+                      : '${_parseNutrientValue(nutrients['calories'])} kcal', 
+                    Colors.orange,
+                    () => _onEditNutrient(
+                      'Calories',
+                      _editedCalories ?? _parseNutrientValue(nutrients['calories']),
+                      (value) => setState(() => _editedCalories = value)
+                    ),
+                    isEdited: _editedCalories != null
+                  ),
+                  const SizedBox(height: 10),
+                  _buildNutrientRow(
+                    'Protein', 
+                    _editedProtein != null 
+                      ? '${_editedProtein!} g (edited)' 
+                      : '${_parseNutrientValue(nutrients['protein'])} g', 
+                    Colors.red,
+                    () => _onEditNutrient(
+                      'Protein',
+                      _editedProtein ?? _parseNutrientValue(nutrients['protein']),
+                      (value) => setState(() => _editedProtein = value)
+                    ),
+                    isEdited: _editedProtein != null
+                  ),
+                  const SizedBox(height: 10),
+                  _buildNutrientRow(
+                    'Carbs', 
+                    _editedCarbs != null 
+                      ? '${_editedCarbs!} g (edited)' 
+                      : '${_parseNutrientValue(nutrients['carbs'])} g', 
+                    Colors.blue,
+                    () => _onEditNutrient(
+                      'Carbs',
+                      _editedCarbs ?? _parseNutrientValue(nutrients['carbs']),
+                      (value) => setState(() => _editedCarbs = value)
+                    ),
+                    isEdited: _editedCarbs != null
+                  ),
+                  const SizedBox(height: 10),
+                  _buildNutrientRow(
+                    'Fat', 
+                    _editedFat != null 
+                      ? '${_editedFat!} g (edited)' 
+                      : '${_parseNutrientValue(nutrients['fat'])} g', 
+                    Colors.yellow,
+                    () => _onEditNutrient(
+                      'Fat',
+                      _editedFat ?? _parseNutrientValue(nutrients['fat']),
+                      (value) => setState(() => _editedFat = value)
+                    ),
+                    isEdited: _editedFat != null
+                  ),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Text(
+                      'Tap the edit buttons to customize nutrition values',
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey[500],
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -830,30 +1009,47 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey[900],
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: ListView.builder(
-            shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-            itemCount: _searchResults.length,
-          itemBuilder: (context, index) {
-              final food = _searchResults[index];
-              return ListTile(
-                title: Text(
-                  food['name'] ?? food['food_name'] ?? 'Unknown Food',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                  ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: Colors.purpleAccent.withOpacity(0.3),
+                  width: 1,
                 ),
-                trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
-                onTap: () {
-                  _selectFood(food);
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purpleAccent.withOpacity(0.1),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _searchResults.length,
+                itemBuilder: (context, index) {
+                  final food = _searchResults[index];
+                  return ListTile(
+                    title: Text(
+                      food['name'] ?? food['food_name'] ?? 'Unknown Food',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
+                    onTap: () {
+                      _selectFood(food);
+                    },
+                  );
                 },
-              );
-            },
+              ),
+            ),
           ),
         ),
       ],
@@ -865,13 +1061,13 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Common Foods Examples',
+          'Recent Foods',
           style: GoogleFonts.poppins(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.bold,
-                  ),
-                ),
+          ),
+        ),
         const SizedBox(height: 4),
         Text(
           'Type these in the search box above',
@@ -883,81 +1079,144 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         ),
         const SizedBox(height: 16),
         _recentFoods.isEmpty
-            ? Center(
-                child: Text(
-                  'No common foods available',
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: Colors.purpleAccent.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'No common foods available',
                   style: GoogleFonts.poppins(
                     color: Colors.grey[400],
-                    fontSize: 14,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               )
-            : Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.all(10),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 2.5,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: _recentFoods.length,
-                  itemBuilder: (context, index) {
-                    final food = _recentFoods[index];
-                    String foodName = food['food_name'] ?? food['name'] ?? 'Unknown Food';
-                    
-                    // Determine icon color based on food name
-                    Color chipColor;
-                    if (foodName.toLowerCase().contains('water')) {
-                      chipColor = Colors.blue.withOpacity(0.7);
-                    } else if (foodName.toLowerCase().contains('fruit') || 
-                              foodName.toLowerCase().contains('apple')) {
-                      chipColor = Colors.red.withOpacity(0.7);
-                    } else if (foodName.toLowerCase().contains('coffee') ||
-                              foodName.toLowerCase().contains('tea')) {
-                      chipColor = Colors.brown.withOpacity(0.7);
-                    } else if (foodName.toLowerCase().contains('chicken') ||
-                              foodName.toLowerCase().contains('meat')) {
-                      chipColor = Colors.orange.withOpacity(0.7);
-                    } else if (foodName.toLowerCase().contains('veggie') ||
-                              foodName.toLowerCase().contains('salad')) {
-                      chipColor = Colors.green.withOpacity(0.7);
-                    } else {
-                      chipColor = Colors.purple.withOpacity(0.7);
-                    }
-                    
-                    // Trim the name if it's too long
-                    if (foodName.length > 15) {
-                      foodName = foodName.substring(0, 13) + '...';
-                    }
-                    
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: chipColor,
-                        borderRadius: BorderRadius.circular(8),
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: Colors.purpleAccent.withOpacity(0.3),
+                        width: 1,
                       ),
-                      child: Center(
-                        child: Text(
-                          foodName,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.purpleAccent.withOpacity(0.1),
+                          blurRadius: 10,
+                          spreadRadius: 1,
                         ),
+                      ],
+                    ),
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.all(10),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 3.0,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
                       ),
-                    );
-                  },
+                      itemCount: _recentFoods.length,
+                      itemBuilder: (context, index) {
+                        final food = _recentFoods[index];
+                        String foodName = food['food_name'] ?? food['name'] ?? 'Unknown Food';
+                        
+                        // Determine icon color based on food name
+                        Color chipColor;
+                        if (foodName.toLowerCase().contains('water')) {
+                          chipColor = Colors.blue.withOpacity(0.7);
+                        } else if (foodName.toLowerCase().contains('fruit') || 
+                                  foodName.toLowerCase().contains('apple')) {
+                          chipColor = Colors.red.withOpacity(0.7);
+                        } else if (foodName.toLowerCase().contains('coffee') ||
+                                  foodName.toLowerCase().contains('tea')) {
+                          chipColor = Colors.brown.withOpacity(0.7);
+                        } else if (foodName.toLowerCase().contains('chicken') ||
+                                  foodName.toLowerCase().contains('meat')) {
+                          chipColor = Colors.orange.withOpacity(0.7);
+                        } else if (foodName.toLowerCase().contains('veggie') ||
+                                  foodName.toLowerCase().contains('salad')) {
+                          chipColor = Colors.green.withOpacity(0.7);
+                        } else {
+                          chipColor = Colors.purpleAccent.withOpacity(0.7);
+                        }
+                        
+                        // Trim the name if it's too long
+                        if (foodName.length > 15) {
+                          foodName = foodName.substring(0, 13) + '...';
+                        }
+                        
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              _selectFood(food);
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: chipColor,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: chipColor.withOpacity(0.5),
+                                    blurRadius: 4,
+                                    spreadRadius: 0,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        foodName,
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        textAlign: TextAlign.left,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.add_circle,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                ),
+              ),
+            );
+          },
+                    ),
+                  ),
                 ),
         ),
       ],

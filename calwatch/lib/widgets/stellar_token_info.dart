@@ -1,212 +1,232 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/streak_service.dart';
+import 'package:intl/intl.dart';
 
 class StellarTokenInfo extends StatefulWidget {
-  const StellarTokenInfo({super.key});
+  const StellarTokenInfo({Key? key}) : super(key: key);
 
   @override
   State<StellarTokenInfo> createState() => _StellarTokenInfoState();
 }
 
 class _StellarTokenInfoState extends State<StellarTokenInfo> {
-  final StreakService _streakService = StreakService();
   String _tokenBalance = "0";
   bool _isLoading = true;
-  bool _hasError = false;
-  String _errorMessage = "";
-  bool _isAtMilestone = false;
-  int _currentStreak = 0;
-
+  Map<String, String> _accountInfo = {};
+  
   @override
   void initState() {
     super.initState();
     _loadTokenInfo();
   }
-
+  
   Future<void> _loadTokenInfo() async {
     try {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-      });
-
-      // First check if eligible for reward
-      final rewardVerification = await _streakService.debugVerifyRewardSystem();
-      final isEligibleForReward = rewardVerification['eligibleForReward'] == true;
-      _currentStreak = rewardVerification['currentStreak'] ?? 0;
-      _isAtMilestone = rewardVerification['isAtMilestone'] == true;
-      
-      // If eligible, issue reward before getting balance
-      if (isEligibleForReward) {
-        final rewardResult = await _streakService.debugForceReward();
-        final currentStreak = rewardVerification['currentStreak'];
-        
-        // Show notification about tokens being awarded
-        if (rewardResult['rewardSuccess'] == true) {
-          final tokensAwarded = _getTokenAmountForStreak(currentStreak);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('🎉 Congratulations! You earned $tokensAwarded STREAK tokens for your $currentStreak-day streak!'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          // Reset milestone status after awarding
-          _isAtMilestone = false;
-        }
-      }
-
-      // Now get the token balance (which will include any newly issued tokens)
-      final balance = await _streakService.getStellarTokenBalance();
+      final streakService = StreakService();
+      final balance = await streakService.getStellarTokenBalance();
+      final accountInfo = await streakService.getStellarAccountInfo();
       
       setState(() {
         _tokenBalance = balance;
+        _accountInfo = accountInfo;
         _isLoading = false;
       });
     } catch (e) {
+      print('Error loading token info: $e');
       setState(() {
         _isLoading = false;
-        _hasError = true;
-        _errorMessage = e.toString();
       });
     }
   }
-
-  // Helper method to determine token amount based on streak milestone
-  String _getTokenAmountForStreak(int streak) {
-    if (streak >= 30) return "10";
-    if (streak >= 7) return "3";
-    if (streak >= 3) return "1";
-    return "0";
-  }
-
+  
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purpleAccent.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Streak Tokens",
-                  style: Theme.of(context).textTheme.titleLarge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _loadTokenInfo,
+                child: const Icon(
+                  Icons.token,
+                  color: Colors.purpleAccent,
+                  size: 20,
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (_hasError)
+              ),
+              const SizedBox(width: 12),
               Text(
-                "Error loading token info: $_errorMessage",
-                style: TextStyle(color: Colors.red),
-              )
-            else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Current Balance:",
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.star, color: Colors.amber),
-                      const SizedBox(width: 8),
-                      Text(
-                        "$_tokenBalance STREAK",
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                'Streak Tokens',
+                style: GoogleFonts.montserrat(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _isLoading
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.purpleAccent,
                       ),
-                    ],
+                    ),
                   ),
-                  
-                  if (_isAtMilestone) ...[
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Token balance
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star,
+                          color: Colors.amberAccent,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Balance:',
+                          style: GoogleFonts.montserrat(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$_tokenBalance TOKENS',
+                          style: GoogleFonts.montserrat(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
+                    // Reward explanation
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.2),
+                        color: Colors.black.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green),
+                        border: Border.all(
+                          color: Colors.purpleAccent.withOpacity(0.3),
+                          width: 1,
+                        ),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.celebration, color: Colors.amber),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              "Congratulations! You've reached a $_currentStreak-day streak milestone in your current streak cycle! Refresh to claim your tokens.",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline,
+                                color: Colors.purpleAccent,
+                                size: 16,
                               ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Token Rewards',
+                                style: GoogleFonts.montserrat(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Earn Stellar-based CALS tokens for reaching streak milestones:',
+                            style: GoogleFonts.montserrat(
+                              color: Colors.grey[300],
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Milestone rewards
+                          _buildMilestoneRow('3 days', '1 token'),
+                          _buildMilestoneRow('7 days', '3 tokens'),
+                          _buildMilestoneRow('10 days', '4 tokens'),
+                          _buildMilestoneRow('15 days', '5 tokens'),
+                          _buildMilestoneRow('21 days', '7 tokens'),
+                          _buildMilestoneRow('25 days', '8 tokens'),
+                          _buildMilestoneRow('30 days', '10 tokens'),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tokens are automatically sent to your wallet when milestones are reached.',
+                            style: GoogleFonts.montserrat(
+                              color: Colors.grey[400],
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                  
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Earn tokens at these streak milestones:",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildMilestoneRow("3-day streak", "1 token", _currentStreak == 3),
-                  const SizedBox(height: 4),
-                  _buildMilestoneRow("7-day streak", "3 tokens", _currentStreak == 7),
-                  const SizedBox(height: 4),
-                  _buildMilestoneRow("30-day streak", "10 tokens", _currentStreak == 30),
-                ],
-              ),
-          ],
-        ),
+                ),
+        ],
       ),
     );
   }
-
-  Widget _buildMilestoneRow(String milestone, String reward, bool isCurrentMilestone) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            if (isCurrentMilestone) 
-              const Icon(Icons.emoji_events, color: Colors.amber, size: 16)
-            else
-              const SizedBox(width: 16),
-            Text(
-              milestone,
-              style: TextStyle(
-                fontWeight: isCurrentMilestone ? FontWeight.bold : FontWeight.normal,
-                color: isCurrentMilestone ? Colors.amber : null,
-              ),
-            ),
-          ],
-        ),
-        Text(
-          reward,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isCurrentMilestone ? Colors.amber : null,
+  
+  Widget _buildMilestoneRow(String milestone, String reward) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          const SizedBox(width: 8),
+          Icon(
+            Icons.circle,
+            color: Colors.purpleAccent.withOpacity(0.5),
+            size: 8,
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Text(
+            milestone,
+            style: GoogleFonts.montserrat(
+              color: Colors.grey[300],
+              fontSize: 12,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            reward,
+            style: GoogleFonts.montserrat(
+              color: Colors.purpleAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
-} 
+}

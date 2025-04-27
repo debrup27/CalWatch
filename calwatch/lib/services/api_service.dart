@@ -584,7 +584,7 @@ class ApiService {
       print('Request body: $requestBody');
       
       final response = await http.post(
-        Uri.parse('$baseUrl/api/dailyGoals'),
+        Uri.parse('$baseUrl$dailyGoalEndpoint'),
         headers: headers,
         body: requestBody,
       );
@@ -598,7 +598,7 @@ class ApiService {
         if (refreshed) {
           // Retry with new token
           final retryResponse = await http.post(
-            Uri.parse('$baseUrl/api/dailyGoals'),
+            Uri.parse('$baseUrl$dailyGoalEndpoint'),
             headers: await _buildHeaders(),
             body: requestBody,
           );

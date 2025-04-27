@@ -77,7 +77,27 @@ class StreakService {
   // Check if penalty is active
   Future<bool> isPenaltyActive() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_penaltyActiveKey) ?? false;
+    final isPenalty = prefs.getBool(_penaltyActiveKey) ?? false;
+    
+    if (isPenalty) {
+      // Get the missed date to check if a full day has passed
+      final missedDateStr = prefs.getString(_missedDateKey);
+      if (missedDateStr != null) {
+        final missedDate = DateTime.parse(missedDateStr);
+        final now = DateTime.now();
+        
+        // Only consider penalty active if the missed date is at least 24 hours ago
+        // This prevents the penalty from showing right after midnight
+        final timeSinceMissed = now.difference(missedDate);
+        if (timeSinceMissed.inHours < 24) {
+          // Less than 24 hours have passed since the goal was missed
+          // So don't show the penalty yet
+          return false;
+        }
+      }
+    }
+    
+    return isPenalty;
   }
   
   // Get the date when goal was missed
@@ -215,7 +235,8 @@ class StreakService {
         }
         
         // NEW: Check if this is a streak milestone that deserves Stellar token reward
-        if (newStreak == 3 || newStreak == 7 || newStreak == 30) {
+        if (newStreak == 3 || newStreak == 7 || newStreak == 10 || 
+            newStreak == 15 || newStreak == 21 || newStreak == 25 || newStreak == 30) {
           await _rewardStellarTokens(newStreak);
         }
       }
@@ -667,6 +688,31 @@ class StreakService {
     };
   }
   
+  // Check if current streak matches reward milestone
+  Future<bool> isAtRewardMilestone() async {
+    final currentStreak = await getStreakCount();
+    developer.log("[StreakService] Checking if streak $currentStreak is at reward milestone");
+    return currentStreak == 3 || 
+           currentStreak == 7 || 
+           currentStreak == 10 || 
+           currentStreak == 15 || 
+           currentStreak == 21 || 
+           currentStreak == 25 || 
+           currentStreak == 30;
+  }
+  
+  // Get token amount for specific streak day milestone
+  int getTokenAmountForStreak(int streakDays) {
+    if (streakDays == 3) return 1;
+    if (streakDays == 7) return 3;
+    if (streakDays == 10) return 4;
+    if (streakDays == 15) return 5;
+    if (streakDays == 21) return 7;
+    if (streakDays == 25) return 8;
+    if (streakDays == 30) return 10;
+    return 0;
+  }
+  
   // NEW: Reward Stellar tokens for streak milestones
   Future<bool> _rewardStellarTokens(int streakDays) async {
     developer.log("[StreakService] Attempting to reward Stellar tokens for streak: $streakDays days");
@@ -685,14 +731,17 @@ class StreakService {
       final accountInfo = await stellarService.verifyAccounts();
       developer.log("[StreakService] Account verification results: $accountInfo");
       
+      // Determine token amount based on streak milestone
+      int tokenAmount = getTokenAmountForStreak(streakDays);
+      
       // Issue reward tokens based on streak milestone
-      developer.log("[StreakService] Calling rewardUserForStreak method");
+      developer.log("[StreakService] Calling rewardUserForStreak method with $tokenAmount tokens");
       final success = await stellarService.rewardUserForStreak(streakDays);
       
       if (success) {
         // Get new balance
         final afterBalance = await stellarService.getUserTokenBalance();
-        developer.log("[StreakService] Successfully rewarded user with Stellar tokens for $streakDays day streak");
+        developer.log("[StreakService] Successfully rewarded user with $tokenAmount Stellar tokens for $streakDays day streak");
         developer.log("[StreakService] Balance before: $beforeBalance, Balance after: $afterBalance");
       } else {
         developer.log("[StreakService] Failed to reward user with Stellar tokens");
@@ -737,13 +786,6 @@ class StreakService {
     }
   }
   
-  // Check if current streak matches reward milestone
-  Future<bool> isAtRewardMilestone() async {
-    final currentStreak = await getStreakCount();
-    developer.log("[StreakService] Checking if streak $currentStreak is at reward milestone");
-    return currentStreak == 3 || currentStreak == 7 || currentStreak == 30;
-  }
-  
   // Debug: Force reward for current streak (for testing)
   Future<Map<String, dynamic>> debugForceReward() async {
     try {
@@ -767,13 +809,15 @@ class StreakService {
       developer.log("[StreakService] DEBUG: Forcing reward for streak: $currentStreak");
       bool rewardSuccess = false;
       String rewardError = "";
+      int tokenAmount = getTokenAmountForStreak(currentStreak);
       try {
         // First try regular milestone rewards
         rewardSuccess = await _rewardStellarTokens(currentStreak);
         if (!rewardSuccess) {
           // If that fails, try a supported milestone (for testing)
           int testMilestone = 3; // Use 3-day streak as test milestone
-          developer.log("[StreakService] DEBUG: Regular reward failed, trying with test milestone: $testMilestone");
+          tokenAmount = getTokenAmountForStreak(testMilestone);
+          developer.log("[StreakService] DEBUG: Regular reward failed, trying with test milestone: $testMilestone (tokens: $tokenAmount)");
           rewardSuccess = await stellarService.rewardUserForStreak(testMilestone);
         }
       } catch (e) {
@@ -792,6 +836,7 @@ class StreakService {
       
       return {
         'streak': currentStreak,
+        'tokenAmount': tokenAmount,
         'rewardSuccess': rewardSuccess,
         'rewardError': rewardError,
         'beforeBalance': beforeBalance,
@@ -816,6 +861,10 @@ class StreakService {
       final currentStreak = await getStreakCount();
       result['currentStreak'] = currentStreak;
       
+      // Include token amount
+      final tokenAmount = getTokenAmountForStreak(currentStreak);
+      result['tokenAmount'] = tokenAmount;
+      
       // Create Stellar service
       final stellarService = StellarStreakTokenService();
       await stellarService.initialize();
@@ -824,7 +873,13 @@ class StreakService {
       result['accountVerification'] = await stellarService.verifyAccounts();
       
       // Check if at milestone
-      result['isAtMilestone'] = currentStreak == 3 || currentStreak == 7 || currentStreak == 30;
+      result['isAtMilestone'] = currentStreak == 3 || 
+                               currentStreak == 7 || 
+                               currentStreak == 10 || 
+                               currentStreak == 15 || 
+                               currentStreak == 21 || 
+                               currentStreak == 25 || 
+                               currentStreak == 30;
       
       // Get cached reward milestone
       final prefs = await SharedPreferences.getInstance();
@@ -874,6 +929,20 @@ class StreakService {
       return {
         'error': e.toString(),
       };
+    }
+  }
+  
+  // Clear streak history
+  Future<void> clearStreakHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    try {
+      // Clear the streak history but keep the current streak count
+      await prefs.setString(_streakHistoryKey, json.encode([]));
+      developer.log("[StreakService] Streak history cleared successfully");
+    } catch (e) {
+      developer.log("[StreakService] Error clearing streak history: $e", error: e);
+      throw Exception('Failed to clear streak history: $e');
     }
   }
 } 

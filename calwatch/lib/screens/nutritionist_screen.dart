@@ -257,69 +257,226 @@ class _NutritionistScreenState extends State<NutritionistScreen> with SingleTick
   // Extract and save nutrition values from Padma's response
   Future<void> _extractAndSaveNutritionValues(String response) async {
     try {
-      // Regular expressions to extract nutrition values
-      final caloriesRegex = RegExp(r'(\d+)[\s-]*calories', caseSensitive: false);
-      final proteinRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*protein', caseSensitive: false);
-      final carbsRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*carb(?:ohydrate)?s?', caseSensitive: false);
-      final fatRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*fat', caseSensitive: false);
+      print('Extracting nutrition values from: $response');
       
-      // Extract values
-      int? calories;
-      int? protein;
-      int? carbs;
-      int? fat;
-      
-      final caloriesMatch = caloriesRegex.firstMatch(response);
-      if (caloriesMatch != null && caloriesMatch.groupCount >= 1) {
-        calories = int.tryParse(caloriesMatch.group(1)!);
+      // First, check if this response is about a full day nutrition plan
+      // rather than a specific meal plan
+      if (!_isFullDayNutritionPlan(response)) {
+        print('Response appears to be about a specific meal or not a full nutrition plan. Skipping daily goal update.');
+        return;
       }
       
-      final proteinMatch = proteinRegex.firstMatch(response);
-      if (proteinMatch != null && proteinMatch.groupCount >= 1) {
-        protein = int.tryParse(proteinMatch.group(1)!);
-      }
+      print('Response appears to be about a full day nutrition plan. Proceeding with extraction.');
+
+      // Attempt extraction with primary regex patterns
+      Map<String, int?> extractedValues = _attemptExtraction(response);
       
-      final carbsMatch = carbsRegex.firstMatch(response);
-      if (carbsMatch != null && carbsMatch.groupCount >= 1) {
-        carbs = int.tryParse(carbsMatch.group(1)!);
-      }
-      
-      final fatMatch = fatRegex.firstMatch(response);
-      if (fatMatch != null && fatMatch.groupCount >= 1) {
-        fat = int.tryParse(fatMatch.group(1)!);
-      }
-      
-      // If we found at least one value, save to backend
-      if (calories != null || protein != null || carbs != null || fat != null) {
-        final Map<String, dynamic> nutritionValues = {};
+      // If not all values are available, retry with alternative patterns
+      if (extractedValues['calories'] == null || 
+          extractedValues['protein'] == null || 
+          extractedValues['carbs'] == null || 
+          extractedValues['fat'] == null) {
         
-        if (calories != null) nutritionValues['calories'] = calories;
-        if (protein != null) nutritionValues['protein'] = protein;
-        if (carbs != null) nutritionValues['carbohydrates'] = carbs;
-        if (fat != null) nutritionValues['fat'] = fat;
+        print('Not all values extracted in first attempt, trying alternative patterns...');
+        Map<String, int?> retryValues = _attemptAlternativeExtraction(response);
         
-        print('Extracted nutrition values: $nutritionValues');
+        // Merge the results, taking values from retry only if the original was null
+        if (extractedValues['calories'] == null) extractedValues['calories'] = retryValues['calories'];
+        if (extractedValues['protein'] == null) extractedValues['protein'] = retryValues['protein'];
+        if (extractedValues['carbs'] == null) extractedValues['carbs'] = retryValues['carbs'];
+        if (extractedValues['fat'] == null) extractedValues['fat'] = retryValues['fat'];
+      }
+      
+      // Extract the final values
+      int? calories = extractedValues['calories'];
+      int? protein = extractedValues['protein'];
+      int? carbs = extractedValues['carbs'];
+      int? fat = extractedValues['fat'];
+      
+      // Only proceed if ALL values are available
+      if (calories != null && protein != null && carbs != null && fat != null) {
+        final Map<String, dynamic> nutritionValues = {
+          'calories': calories,
+          'protein': protein,
+          'carbohydrates': carbs,
+          'fat': fat
+        };
         
-        // Only send to backend if we have at least one value
-        if (nutritionValues.isNotEmpty) {
-          final result = await _apiService.updateDailyGoals(nutritionValues);
-          
-          // Show success message if values were saved
-          if (result.isNotEmpty && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Nutrition goals updated with Padma\'s recommendations'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
+        print('All nutrition values extracted successfully: $nutritionValues');
+        
+        // Send to backend since we have all values
+        final result = await _apiService.updateDailyGoals(nutritionValues);
+        
+        // Show success message if values were saved
+        if (result.isNotEmpty && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Daily nutrition goals updated with Padma\'s recommendations'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
+      } else {
+        print('Not all nutrition values could be extracted:');
+        print('Calories: $calories, Protein: $protein, Carbs: $carbs, Fat: $fat');
       }
     } catch (e) {
       print('Error extracting nutrition values: $e');
       // Don't show error to user since this is a background operation
     }
+  }
+  
+  // Check if the response is about a full day nutrition plan
+  bool _isFullDayNutritionPlan(String response) {
+    // Convert to lowercase for case-insensitive matching
+    final lowerResponse = response.toLowerCase();
+    
+    // Check if the response contains specific meal-related phrases
+    // that would indicate it's NOT a full day plan
+    final mealSpecificPhrases = [
+      'breakfast recipe',
+      'breakfast plan',
+      'lunch recipe',
+      'lunch plan',
+      'dinner recipe',
+      'dinner plan',
+      'snack recipe',
+      'snack idea',
+      'meal recipe',
+      'single meal',
+      'this meal',
+      'for this recipe',
+    ];
+    
+    for (final phrase in mealSpecificPhrases) {
+      if (lowerResponse.contains(phrase)) {
+        return false;
+      }
+    }
+    
+    // Check if response contains phrases that indicate it IS a full day plan
+    final fullDayPhrases = [
+      'daily nutrition',
+      'daily goals',
+      'daily caloric',
+      'daily intake',
+      'daily needs',
+      'day\'s nutrition',
+      'per day',
+      'each day',
+      'daily macros',
+      'daily macronutrients',
+      'nutrition plan',
+      'diet plan',
+      'your diet should',
+      'recommended daily',
+      'total daily',
+    ];
+    
+    for (final phrase in fullDayPhrases) {
+      if (lowerResponse.contains(phrase)) {
+        return true;
+      }
+    }
+    
+    // If the response contains the special formatted nutrients section at the beginning
+    // OR contains all four nutrition labels with values close together
+    // we'll assume it's a full day plan (this matches our prompt to the AI)
+    if (lowerResponse.contains('**calories:') && 
+        lowerResponse.contains('**protein:') && 
+        lowerResponse.contains('**carbohydrates:') && 
+        lowerResponse.contains('**fat:')) {
+      return true;
+    }
+    
+    // By default, be conservative and don't update daily goals
+    // unless we're confident it's a full day plan
+    return false;
+  }
+  
+  // Primary extraction attempt with standard patterns
+  Map<String, int?> _attemptExtraction(String response) {
+    // Regex patterns
+    final caloriesRegex = RegExp(r'Calories\s*:\s*(\d+)\s*calories', caseSensitive: false);
+    final proteinRegex = RegExp(r'Protein:\s*(\d+)g', caseSensitive: false);
+    final carbsRegex = RegExp(r'Carbohydrates:\s*(\d+)g', caseSensitive: false);
+    final fatRegex = RegExp(r'Fat:\s*(\d+)g', caseSensitive: false);
+    
+    // Extract values
+    int? calories;
+    int? protein;
+    int? carbs;
+    int? fat;
+    
+    final caloriesMatch = caloriesRegex.firstMatch(response);
+    if (caloriesMatch != null && caloriesMatch.groupCount >= 1) {
+      calories = int.tryParse(caloriesMatch.group(1)!);
+    }
+    
+    final proteinMatch = proteinRegex.firstMatch(response);
+    if (proteinMatch != null && proteinMatch.groupCount >= 1) {
+      protein = int.tryParse(proteinMatch.group(1)!);
+    }
+    
+    final carbsMatch = carbsRegex.firstMatch(response);
+    if (carbsMatch != null && carbsMatch.groupCount >= 1) {
+      carbs = int.tryParse(carbsMatch.group(1)!);
+    }
+    
+    final fatMatch = fatRegex.firstMatch(response);
+    if (fatMatch != null && fatMatch.groupCount >= 1) {
+      fat = int.tryParse(fatMatch.group(1)!);
+    }
+    
+    return {
+      'calories': calories,
+      'protein': protein,
+      'carbs': carbs,
+      'fat': fat
+    };
+  }
+  
+  // Alternative extraction attempt with more flexible patterns
+  Map<String, int?> _attemptAlternativeExtraction(String response) {
+    // Alternative patterns that are more flexible
+    final altCaloriesRegex = RegExp(r'(\d+)[\s-]*calories', caseSensitive: false);
+    final altProteinRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*protein', caseSensitive: false);
+    final altCarbsRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*carb(?:ohydrate)?s?', caseSensitive: false);
+    final altFatRegex = RegExp(r'(\d+)[\s-]*g(?:rams)?[\s-]*(?:of)?[\s-]*fat', caseSensitive: false);
+    
+    // Extract values
+    int? calories;
+    int? protein;
+    int? carbs;
+    int? fat;
+    
+    final caloriesMatch = altCaloriesRegex.firstMatch(response);
+    if (caloriesMatch != null && caloriesMatch.groupCount >= 1) {
+      calories = int.tryParse(caloriesMatch.group(1)!);
+    }
+    
+    final proteinMatch = altProteinRegex.firstMatch(response);
+    if (proteinMatch != null && proteinMatch.groupCount >= 1) {
+      protein = int.tryParse(proteinMatch.group(1)!);
+    }
+    
+    final carbsMatch = altCarbsRegex.firstMatch(response);
+    if (carbsMatch != null && carbsMatch.groupCount >= 1) {
+      carbs = int.tryParse(carbsMatch.group(1)!);
+    }
+    
+    final fatMatch = altFatRegex.firstMatch(response);
+    if (fatMatch != null && fatMatch.groupCount >= 1) {
+      fat = int.tryParse(fatMatch.group(1)!);
+    }
+    
+    return {
+      'calories': calories,
+      'protein': protein,
+      'carbs': carbs,
+      'fat': fat
+    };
   }
 
   @override

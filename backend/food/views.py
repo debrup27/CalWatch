@@ -13,8 +13,8 @@ from rest_framework.exceptions import ValidationError
 
 # Create your views here.
 
-class DailyGoalView(generics.RetrieveAPIView):
-    """API endpoint to get user's daily goals"""
+class DailyGoalView(generics.RetrieveUpdateAPIView):
+    """API endpoint to get or update user's daily goals"""
     serializer_class = DailyGoalSerializer
     permission_classes = [permissions.IsAuthenticated]
     
@@ -22,7 +22,40 @@ class DailyGoalView(generics.RetrieveAPIView):
         try:
             return DailyGoal.objects.get(user=self.request.user)
         except DailyGoal.DoesNotExist:
-            raise Http404("Daily goals not found")
+            # Create default goals instead of raising 404
+            return DailyGoal.objects.create(
+                user=self.request.user,
+                calories=2000,
+                protein=50,
+                carbohydrates=250,
+                fat=70
+            )
+            
+    def post(self, request, *args, **kwargs):
+        """Create or update daily goals directly from user input"""
+        try:
+            # Get or create daily goal object for the user
+            daily_goal, created = DailyGoal.objects.get_or_create(
+                user=request.user,
+                defaults={
+                    'calories': 2000,
+                    'protein': 50,
+                    'carbohydrates': 250,
+                    'fat': 70
+                }
+            )
+            
+            # Update with provided values
+            serializer = self.get_serializer(daily_goal, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to update daily goals: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class WaterIntakeView(generics.ListCreateAPIView):
     """API endpoint to list and create water intake records"""

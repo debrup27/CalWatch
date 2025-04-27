@@ -100,7 +100,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
     
     // Schedule data fetch after build completes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // First load streak information independently to ensure quote loads
+      await _loadStreakInformation();
+      // Then load the full daily data
       _fetchDailyData();
       _checkPenaltyStatus();
     });
@@ -112,10 +115,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
   
+  // New method to load streak information independently
+  Future<void> _loadStreakInformation() async {
+    try {
+      // Get streak count and status directly
+      _streakCount = await _streakService.getStreakCount();
+      _isOnStreak = await _streakService.isOnStreak();
+      
+      // Immediately load the motivational quote once we have the streak count
+      _loadMotivationalQuote();
+    } catch (e) {
+      print('Error loading streak information: $e');
+    }
+  }
+  
   void _fetchDailyData() async {
     setState(() {
       _isLoading = true;
-      _isLoadingQuote = true;
     });
     
     try {
@@ -334,6 +350,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   
   // Add method to load motivational quote
   Future<void> _loadMotivationalQuote() async {
+    setState(() {
+      _isLoadingQuote = true;
+    });
+    
     if (_streakCount == 0) {
       setState(() {
         _motivationalQuote = "Every nutritional journey begins with a single healthy choice. Start your streak today!";
@@ -343,11 +363,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
     
     try {
+      print('Loading motivational quote for streak: $_streakCount');
       final quote = await _groqService.getStreakMotivationalQuote(_streakCount);
-      setState(() {
-        _motivationalQuote = quote;
-        _isLoadingQuote = false;
-      });
+      
+      if (mounted) {
+        setState(() {
+          _motivationalQuote = quote;
+          _isLoadingQuote = false;
+        });
+      }
     } catch (e) {
       print('Error loading motivational quote: $e');
       // Fallback quotes based on streak length
@@ -361,10 +385,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       
       // Pick a random fallback quote
       final randomIndex = DateTime.now().millisecondsSinceEpoch % fallbackQuotes.length;
-      setState(() {
-        _motivationalQuote = fallbackQuotes[randomIndex];
-        _isLoadingQuote = false;
-      });
+      
+      if (mounted) {
+        setState(() {
+          _motivationalQuote = fallbackQuotes[randomIndex];
+          _isLoadingQuote = false;
+        });
+      }
     }
   }
   
@@ -1057,7 +1084,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         children: [
           Icon(
             Icons.local_fire_department,
-            color: _getStreakColor(),
+            color: _streakCount > 0 ? _getStreakColor() : Colors.grey,
             size: 32,
           ),
           Positioned(
