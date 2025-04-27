@@ -75,6 +75,88 @@ Team Members:
 <img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_190409%20-%20Copy.jpg" width="300"> <img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_221500%20-%20Copy.jpg" width="300">
 
 
+## 🧪 How to Run the Project
+
+### Requirements:
+- Python 3.9+
+- Flutter (for frontend)
+- Groq API Key
+- .env file setup
+
+### Local Setup:
+
+#### Backend Setup:
+bash
+# Clone the repo
+git clone https://github.com/debrup27/CalWatch.git
+
+# Navigate to backend
+cd CalWatch/backend
+
+# Set up virtual environment
+py -m venv venv
+venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run server
+py manage.py runserver 0.0.0.0:8000
+
+
+#### .env Setup:
+Inside the `CalWatch/backend` folder, create a `.env` file with the following content:
+bash
+GROQ_API_KEY='your-api-key'  # Get it from Groq Cloud
+BASE_URL='your-ip-address'   # Your public/local IP address
+
+
+#### Frontend Setup:
+bash
+# Navigate to frontend project
+cd CalWatch/
+
+# Install Flutter packages
+flutter pub get
+
+# Run the app
+flutter run
+
+
+---
+
+## 🧬 Future Scope
+
+- 📈 Expand to integrate wearable devices (smartwatches, fitness bands)  
+- 🛡️ Implement multi-layer security for blockchain transactions  
+- 🌐 Add localization for Indian regional languages to reach a wider audience  
+- 🤖 Further personalize AI coaching with user emotion tracking  
+
+---
+
+## 📎 Resources / Credits
+
+- **Groq AI** – Ultra-fast real-time AI engine powering Padma, our nutrition coach  
+- **Monad Blockchain** – Secure and fast blockchain for streak tracking  
+- **Stellar Network** – Fast, low-cost blockchain for token rewards  
+- **Indian Food Composition Tables (IFCT)** – Dataset for Indian nutritional data  
+- **Open Source Libraries** – Flutter packages, Django Rest Framework  
+
+---
+
+## 🏁 Final Words
+
+Building CalWatch was an incredible journey filled with technical and creative challenges. From integrating Indian-specific food data to deploying our own Stellar token and connecting everything seamlessly, every step was a learning experience.  
+Huge thanks to our team, mentors, and the open-source community for their support! 🚀✨
+
+
+---
+
+✅ You can directly *copy-paste* this into your README.md file.  
+Would you also like a quick bonus — a table of contents at the top? (It looks super clean if you want to impress!) 🎯  
+Let me know! 🚀
+
+
 
 ### 📽️ Demo & Deliverables
 ![Demo Video](https://www.youtube.com/watch?v=xp-ORfczERo)
