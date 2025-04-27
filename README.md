@@ -75,6 +75,23 @@ Team Members:
 <img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_190409%20-%20Copy.jpg" width="300"> <img src="https://github.com/debrup27/CalWatch/blob/main/Screenshot_20250427_221500%20-%20Copy.jpg" width="300">
 
 
+## 📽️ Demo & Deliverables
+
+- *Demo Video Link:* [Paste YouTube or Loom link here]  
+- *Pitch Deck / PPT Link:* [Paste Google Slides / PDF link here]  
+
+---
+
+## ✅ Tasks & Bonus Checklist
+
+- [ ] *All members of the team completed the mandatory task - Followed at least 2 of our social channels and filled the form* (Details in Participant Manual)  
+- [ ] *All members of the team completed Bonus Task 1 - Sharing of Badges and filled the form (2 points)*  (Details in Participant Manual)
+- [ ] *All members of the team completed Bonus Task 2 - Signing up for Sprint.dev and filled the form (3 points)*  (Details in Participant Manual)
+
+(Mark with ✅ if completed)
+
+---
+
 ## 🧪 How to Run the Project
 
 ### Requirements:
