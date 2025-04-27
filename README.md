@@ -75,9 +75,9 @@ Team Members:
 
 ## ✅ Tasks & Bonus Checklist
 
-- [ ] *All members of the team completed the mandatory task - Followed at least 2 of our social channels and filled the form* (Details in Participant Manual)  
+- [x] *All members of the team completed the mandatory task - Followed at least 2 of our social channels and filled the form* (Details in Participant Manual)  
 - [ ] *All members of the team completed Bonus Task 1 - Sharing of Badges and filled the form (2 points)*  (Details in Participant Manual)
-- [ ] *All members of the team completed Bonus Task 2 - Signing up for Sprint.dev and filled the form (3 points)*  (Details in Participant Manual)
+- [x] *All members of the team completed Bonus Task 2 - Signing up for Sprint.dev and filled the form (3 points)*  (Details in Participant Manual)
 
 (Mark with ✅ if completed)
 
@@ -93,10 +93,11 @@ Team Members:
 
 ### Local Setup:
 
-#### Backend Setup:
 bash
 # Clone the repo
 git clone https://github.com/debrup27/CalWatch.git
+
+#### Backend Setup:
 
 # Navigate to backend
 cd CalWatch/backend
@@ -112,17 +113,18 @@ pip install -r requirements.txt
 py manage.py runserver 0.0.0.0:8000
 
 
-#### .env Setup:
-Inside the `CalWatch/backend` folder, create a `.env` file with the following content:
-bash
-GROQ_API_KEY='your-api-key'  # Get it from Groq Cloud
-BASE_URL='your-ip-address'   # Your public/local IP address
-
-
 #### Frontend Setup:
 bash
 # Navigate to frontend project
-cd CalWatch/
+cd CalWatch/calwatch
+
+#### .env Setup:
+# Navigate to frontend
+cd CalWatch/calwatch
+
+bash
+GROQ_API_KEY='your-api-key'  # Get it from Groq Cloud
+BASE_URL='your-ip-address'   # Your public/local IP address
 
 # Install Flutter packages
 flutter pub get
@@ -157,16 +159,5 @@ flutter run
 Building CalWatch was an incredible journey filled with technical and creative challenges. From integrating Indian-specific food data to deploying our own Stellar token and connecting everything seamlessly, every step was a learning experience.  
 Huge thanks to our team, mentors, and the open-source community for their support! 🚀✨
 
-
----
-
-✅ You can directly *copy-paste* this into your README.md file.  
-Would you also like a quick bonus — a table of contents at the top? (It looks super clean if you want to impress!) 🎯  
-Let me know! 🚀
-
-
-
-### 📽️ Demo & Deliverables
-![Demo Video](https://www.youtube.com/watch?v=xp-ORfczERo)
 
 
