@@ -118,10 +118,6 @@ py manage.py runserver 0.0.0.0:8000
 cd CalWatch/calwatch
 
 ##### .env Setup:
-# Navigate to frontend
-cd CalWatch/calwatch
-
-bash
 GROQ_API_KEY='your-api-key'  # Get it from Groq Cloud
 BASE_URL='your-ip-address'   # Your public/local IP address
 
